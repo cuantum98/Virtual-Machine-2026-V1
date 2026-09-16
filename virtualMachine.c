@@ -55,17 +55,18 @@ void setSegments(int32_t listSegments[], int16_t cSize){
 
     while (i < 8){
         listSegments[i]=0xFFFFFFFF;
+        i++;
     }
 }
 
 
 //Funcion para inicializar los registros más importantes.
 void setRegisters(int32_t registers[32],int16_t cSize){
-    int CS=26, DS=27, AC=16;
+    int  IP=0,CS=26, DS=27, AC=16;
     registers[CS]=0;
     registers[DS]=1;
     registers[DS]= (registers[DS]<<16) +cSize;
-    registers[0]=registers[CS];
+    registers[IP]=registers[CS];
     registers[AC]=0;
 }
 
@@ -78,14 +79,18 @@ int getDir(int32_t logicDir){
 }
 
 int32_t getOp(int tipoa,int tipob, int8_t *mainMemory,int ip){
+
     
 }
 
 void readNextInst(int8_t *mainMemory, int32_t *registers){
-    int8_t operacion=mainMemory[registers[0]];
-    registers[1]= operacion & 0b11111;
-    registers[2]= (operacion & 0b00110000)>>4;
-    registers[3]= (operacion & 0b11000000)>>6;
+    int8_t operacion=mainMemory[registers[0]]; //Traigo la operacion del IP
+    registers[1]= operacion & 0b11111; //Obtengo codigo de operacion
+    int32_t tipoa= (operacion & 0b00110000)>>4; //tipo operando A
+    int32_t tipob= (operacion & 0b11000000)>>6;//tipo operando B
+    
+
+    registers[0]+=tipoa*8+tipob*8;
 }
 
 void main(){
