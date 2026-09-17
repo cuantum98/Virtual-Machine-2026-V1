@@ -1,11 +1,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+//Instrucción 
+#define IP   0
+#define OPC  1
+#define OP1  2
+#define OP2  3
+
+// Acceso a memoria
+#define LAR  4
+#define MAR  5
+#define MBR  6
+
+// Registros de propósito general
+#define EAX  10
+#define EBX  11
+#define ECX  12
+#define EDX  13
+#define EEX  14
+#define EFX  15
+
+// Registros de estado control 
+#define AC   16
+#define CC   17
+
+// Registros de segmento 
+#define CS   26
+#define DS   27
 
 #define MAXMEMORY 16384
 
-#define 2HBt 0xFFFF0000; //Constantes para tomar los 2 bytes más significativos y los 2 menos significativos.
-#define 2LBt 0x0000FFFF; 
+#define H2Bt 0xFFFF0000//Constantes para tomar los 2 bytes más significativos y los 2 menos significativos.
+#define L2Bt 0x0000FFFF 
 
 
 //funcion que verifica si el archivo es valido, devuelve true si lo es y false si no lo es.
@@ -30,7 +56,7 @@ bool verifyFile(FILE *file) {
 
 //funcion que carga el tamaño del codigo en la variable size.
 void loadCodeSize(FILE *file, int16_t *cSize) {
-    fread(size, sizeof(int16_t), 1, file);
+    fread(cSize, sizeof(int16_t), 1, file);
 }
 
 
@@ -55,38 +81,74 @@ void setSegments(int32_t listSegments[], int16_t cSize){
 
     while (i < 8){
         listSegments[i]=0xFFFFFFFF;
+        i++;
     }
 }
 
 
 //Funcion para inicializar los registros más importantes.
 void setRegisters(int32_t registers[32],int16_t cSize){
-    int CS=26, DS=27, AC=16;
     registers[CS]=0;
     registers[DS]=1;
     registers[DS]= (registers[DS]<<16) +cSize;
-    registers[0]=registers[CS];
+    registers[IP]=registers[CS];
     registers[AC]=0;
 }
 
 
 //Funcion para obtener la direccion fisica a partir de la logica.
-int getDir(int32_t logicDir){
-    int lowByte=logicDir & 2LBt;
-    int highByte=logicDir & 2HBt;
-    return (lowByte+highByte);
+int32_t getDir(int32_t logicDir,int32_t listSegments[]){
+    int lowByte=logicDir & L2Bt;
+    int highByte=logicDir & H2Bt;
+    int base=listSegments[highByte] & H2Bt;
+    return (lowByte+base);
 }
 
-int32_t getOp(int tipoa,int tipob, int8_t *mainMemory,int ip){
+int32_t getOp(int tipo, int8_t *mainMemory,int rindex){
+    int32_t opnd=0;
+    for(int i=rindex;i<rindex+tipo;i++){
+        opnd=opnd<<8;
+        opnd+=mainMemory[i];
+    }
+    return opnd;
+    
     
 }
-
+//Funcion para leer la siguiente instruccion
 void readNextInst(int8_t *mainMemory, int32_t *registers){
-    int8_t operacion=mainMemory[registers[0]];
-    registers[1]= operacion & 0b11111;
-    registers[2]= (operacion & 0b00110000)>>4;
-    registers[3]= (operacion & 0b11000000)>>6;
+    int8_t operacion=mainMemory[registers[0]]; //Traigo la operacion del IP
+    registers[1]= operacion & 0b11111; //Obtengo codigo de operacion
+    int32_t tipoa= (operacion & 0b00110000)>>4; //tipo operando A
+    int32_t tipob= (operacion & 0b11000000)>>6;//tipo operando B
+    registers[2]=(tipoa<<24);
+    registers[3]=(tipob<<24);
+    registers[3]+=getOp(tipob,mainMemory,registers[0]+1);
+    registers[2]+=getOp(tipoa,mainMemory,registers[0]+1+tipob);
+
+
+
+    
+
+    registers[0]+=1+tipoa+tipob;//Sumo el tamaño de la operacion
 }
+
+void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int op=registers[OP2] & 0x00FFFFFF;
+    registers[LAR]=registers[EDX];
+    registers[MAR]=(registers[ECX]&H2Bt) + getDir(registers[LAR],listSegments);
+    if(op==1){
+        //Tomar el input como str(?)
+
+    }
+
+
+
+        
+
+    
+
+}
+
 
 void main(){
     int16_t cSize=0;
