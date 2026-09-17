@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+
+
 //Instrucción 
 #define IP   0
 #define OPC  1
@@ -104,6 +106,8 @@ int32_t getDir(int32_t logicDir,int32_t listSegments[]){
     return (lowByte+base);
 }
 
+
+//Funcion que se encarga de obtener los datos de los operandos.
 int32_t getOp(int tipo, int8_t *mainMemory,int rindex){
     int32_t opnd=0;
     for(int i=rindex;i<rindex+tipo;i++){
@@ -111,9 +115,9 @@ int32_t getOp(int tipo, int8_t *mainMemory,int rindex){
         opnd+=mainMemory[i];
     }
     return opnd;
-    
-    
 }
+
+
 //Funcion para leer la siguiente instruccion
 void readNextInst(int8_t *mainMemory, int32_t *registers){
     int8_t operacion=mainMemory[registers[0]]; //Traigo la operacion del IP
@@ -124,29 +128,22 @@ void readNextInst(int8_t *mainMemory, int32_t *registers){
     registers[3]=(tipob<<24);
     registers[3]+=getOp(tipob,mainMemory,registers[0]+1);
     registers[2]+=getOp(tipoa,mainMemory,registers[0]+1+tipob);
-
-
-
-    
-
     registers[0]+=1+tipoa+tipob;//Sumo el tamaño de la operacion
 }
 
+
+int intToHex(int num){}
+
+//Funcion SYS
 void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     int op=registers[OP2] & 0x00FFFFFF;
     registers[LAR]=registers[EDX];
     registers[MAR]=(registers[ECX]&H2Bt) + getDir(registers[LAR],listSegments);
+
     if(op==1){
-        //Tomar el input como str(?)
-
-    }
-
-
-
         
 
-    
-
+    }
 }
 
 
