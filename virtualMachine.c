@@ -77,20 +77,24 @@ int getDir(int32_t logicDir){
     int highByte=logicDir & 2HBt;
     return (lowByte+highByte);
 }
-
-int32_t getOp(int tipoa,int tipob, int8_t *mainMemory,int ip){
+int32_t getOp(int tipo, int8_t *mainMemory,int ip){
 
     
 }
-
+//Funcion para leer la siguiente instruccion
 void readNextInst(int8_t *mainMemory, int32_t *registers){
-    int8_t operacion=mainMemory[registers[0]]; //Traigo la operacion del IP
+    int8_t operacion=mainMemory[getDir(registers[0])]; //Traigo la operacion del IP
     registers[1]= operacion & 0b11111; //Obtengo codigo de operacion
     int32_t tipoa= (operacion & 0b00110000)>>4; //tipo operando A
     int32_t tipob= (operacion & 0b11000000)>>6;//tipo operando B
+    registers[2]=(tipoa<<24);
+    registers[3]=(tipob<<24);
+
+
+
     
 
-    registers[0]+=tipoa*8+tipob*8;
+    registers[0]+=1+tipoa+tipob;//Sumo el tamaño de la operacion
 }
 
 void main(){
