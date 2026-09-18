@@ -43,7 +43,7 @@ bool verifyFile(FILE *file) {
     int8_t version;
     int16_t tamaño;
 
-    if (fread(id, sizeof(char), 5, file)!=5 || strcmp(id,"VMX26")==0){
+    if (fread(id, sizeof(char), 5, file)!=5 || strcmp(id,"VMX26")!=0){
         fclose(file);
         return false;
     }
@@ -90,11 +90,11 @@ void setSegments(int32_t listSegments[], int16_t cSize){
 
 //Funcion para inicializar los registros más importantes.
 void setRegisters(int32_t registers[32],int16_t cSize){
-    registers[CS]=0;
-    registers[DS]=1;
-    registers[DS]= (registers[DS]<<16) +cSize;
-    registers[IP]=registers[CS];
-    registers[AC]=0;
+    registers[CS] =0;
+    registers[DS] =1;
+    registers[DS] = (registers[DS]<<16);
+    registers[IP] = registers[CS];
+    registers[AC] = 0;
 }
 
 
@@ -132,16 +132,46 @@ void readNextInst(int8_t *mainMemory, int32_t *registers){
 }
 
 
-int intToHex(int num){}
+//Funcion que carga una variable cargada en MBR a memoria dependiendo del mar.
+void loadInMemory(int32_t *registers, int8_t mainMemory){
+    int i;
+    int opSize = (registers[MAR] & H2Bt) >> 16;
+    int dir = registers[MAR] & L2Bt;
+    int aux = registers[MBR];
+
+    for (i=opSize-1;i>=0;i--){
+        mainMemory[dir+i]=aux & FF;
+        aux = aux>>8;
+    }
+}
+
 
 //Funcion SYS
 void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     int op=registers[OP2] & 0x00FFFFFF;
+    int32_t aux;
     registers[LAR]=registers[EDX];
     registers[MAR]=(registers[ECX]&H2Bt) + getDir(registers[LAR],listSegments);
 
     if(op==1){
-        
+        switch (registers[EAX])
+        {
+        case 1:
+            scanf(" %d",&registers[MBR]);
+            break;
+        case 2:
+            scanf(" %c",&registers[MBR]);
+        break;
+        case 4:
+            scanf(" %o",&registers[MBR]);
+        break;
+        case 8:
+            scanf(" %x",&registers[MBR]);
+        break;
+        case 10:
+            //
+        break;
+        }
 
     }
 }
