@@ -120,15 +120,15 @@ int32_t getOp(int tipo, int8_t *mainMemory,int rindex){
 
 //Funcion para leer la siguiente instruccion
 void readNextInst(int8_t *mainMemory, int32_t *registers){
-    int8_t operacion=mainMemory[registers[0]]; //Traigo la operacion del IP
-    registers[1]= operacion & 0b11111; //Obtengo codigo de operacion
+    int8_t operacion=mainMemory[registers[IP]]; //Traigo la operacion del IP
+    registers[OPC]= operacion & 0b11111; //Obtengo codigo de operacion
     int32_t tipoa= (operacion & 0b00110000)>>4; //tipo operando A
     int32_t tipob= (operacion & 0b11000000)>>6;//tipo operando B
-    registers[2]=(tipoa<<24);
-    registers[3]=(tipob<<24);
-    registers[3]+=getOp(tipob,mainMemory,registers[0]+1);
-    registers[2]+=getOp(tipoa,mainMemory,registers[0]+1+tipob);
-    registers[0]+=1+tipoa+tipob;//Sumo el tamaño de la operacion
+    registers[OP1]=(tipoa<<24);
+    registers[OP2]=(tipob<<24);
+    registers[OP2]+=getOp(tipob,mainMemory,registers[0]+1);
+    registers[OP1]+=getOp(tipoa,mainMemory,registers[0]+1+tipob);
+    registers[IP]+=1+tipoa+tipob;//Sumo el tamaño de la operacion
 }
 
 
@@ -148,7 +148,7 @@ void loadInMemory(int32_t *registers, int8_t mainMemory){
 
 //Funcion SYS
 void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
-    int op=registers[OP2] & 0x00FFFFFF;
+    int op=registers[OP2] & 0x00FFFFFF;  
     int32_t aux;
     registers[LAR]=registers[EDX];
     registers[MAR]=(registers[ECX]&H2Bt) + getDir(registers[LAR],listSegments);
@@ -176,6 +176,90 @@ void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     }
 }
 
+void Jmp (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int8_t tipo = registers[OP2] >>> 24; //leo el tipo de operando, que es su byte mas significativo, OP1 no guarda su tipo??
+    //el OP1 deberia guardar en su byte mas significativo, no lo hace el getOP?
+    switch (tipo){ //debo hacer desplazamiento logico o aritmetico? o da igual?
+        case '1': //operando de registro
+            int8_t codReg = registers[OP2] & 0b11111  //int8_t o solo int?
+            registers[IP] =  registers[registers[codReg]];
+            break;
+        case '2': //operando inmediato
+            int16_t valor = registers[OP2] & 0xFFFF;
+            registers[IP] = valor; //debo validar que no se salga del code segment?
+            break;
+        case '3': //operando de memoria
+            int16_t offset = ( (registers[OP2] << 8) >>> 16) ; //saco el codigo de operando con el <<8
+            int8_t codReg = registers[OP2] && 0b11111;
+            registers[IP] = registers[codReg] + offset;
+    }
+
+}
+
+void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]) {
+    int8_t tipo = registers[OP2] >> 24; 
+
+    switch (tipo) {
+        case '1': //operando de registro
+            int16_t codReg = registers[OP2] & 0b11111; //obtengo el codigo
+            int16_t valor = registers[codReg] & 0xFFFF0000; 
+            break;
+        case '2': //operando inmediato
+            int16_t valor = registers[OP2] & 0xFFFF;
+            break;
+        case '3': //operando de memoria;
+            int16_t offset = registers[OP2] & 0xFFFF00;
+            int8_t codReg = registers[OP2] & 0b11111;
+            int16_t valor = mainMemory[getDir(registers[codReg]) + offset];
+    }
+    
+    tipo = registers[OP1] >> 24;
+
+    switch (tipo) {
+        case '1': 
+            codReg = registers[OP1] & 0b11111;
+            registers[codReg] &= valor; //sobrescribe los 2 bits menos significativos
+            break;
+        case '3': //operando de memoria
+            offset = registers[OP1] & 0xFFFF00;
+            codReg = registers[OP1] & 0b11111;
+            mainMemory[getDir(registers[codReg]) + offset] &= valor; 
+    }
+
+
+}
+
+void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]) {
+     int8_t tipo = registers[OP2] >> 24; 
+
+    switch (tipo) {
+        case '1': //operando de registro
+            int16_t codReg = registers[OP2] & 0b11111; //obtengo el codigo
+            int16_t valor = registers[codReg] & 0xFFFF; //los 2 bytes menos significativos del registro que apunta el OP2
+            break;
+        case '2': //operando inmediato
+            int16_t valor = registers[OP2] & 0xFFFF;
+            break;
+        case '3': //operando de memoria;
+            int16_t offset = registers[OP2] & 0xFFFF00;
+            int8_t codReg = registers[OP2] & 0b11111;
+            int16_t valor = mainMemory[getDir(registers[codReg]) + offset];
+    }
+    
+    tipo = registers[OP1] >> 24;
+
+    switch (tipo) {
+        case '1': 
+            codReg = registers[OP1] & 0b11111;
+         registers[codReg] &= (valor<<16) +0xFFFF; //sobrescribe los 2 bits menos significativos
+            break;
+        case '3': //operando de memoria
+            offset = registers[OP1] & 0xFFFF00;
+            codReg = registers[OP1] & 0b11111;
+            mainMemory[getDir(registers[codReg]) + offset] &= (valor<<16) +0xFFFF; 
+    }
+
+}
 
 void main(){
     int16_t cSize=0;
