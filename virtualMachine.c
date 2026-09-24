@@ -194,8 +194,8 @@ void readNextInst(int8_t *mainMemory, int32_t *registers){
     int32_t tipob= (operacion & 0b11000000)>>6;//tipo operando B
     registers[OP1]=(tipoa<<24);
     registers[OP2]=(tipob<<24);
-    registers[OP2]+=getOp(tipob,mainMemory,registers[0]+1);
-    registers[OP1]+=getOp(tipoa,mainMemory,registers[0]+1+tipob);
+    registers[OP2]+=getOp(tipob,mainMemory,registers[IP]+1);
+    registers[OP1]+=getOp(tipoa,mainMemory,registers[IP]+1+tipob);
     registers[IP]+=1+tipoa+tipob;//Sumo el tamaño de la operacion
 }
 
@@ -456,11 +456,10 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
 
 //Funcion JMP
 void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
-    int8_t tipo = registers[OP2] >> 24; //leo el tipo de operando, que es su byte mas significativo, OP1 no guarda su tipo??
-    //el OP1 deberia guardar en su byte mas significativo, no lo hace el getOP?
+    int8_t tipo = registers[OP2] >> 24;
     switch (tipo){ //debo hacer desplazamiento logico o aritmetico? o da igual?
         case '1': //operando de registro
-            int8_t codReg = registers[OP2] & 0b11111;  //int8_t o solo int?
+            int8_t codReg = registers[OP2] & 0b11111;  
             registers[IP] =  registers[registers[codReg]];
             break;
         case '2': //operando inmediato
@@ -468,7 +467,7 @@ void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
             registers[IP] = valor; //debo validar que no se salga del code segment?
             break;
         case '3': //operando de memoria
-            int16_t offset = ( (registers[OP2] << 8) >> 16); //saco el codigo de operando con el <<8
+            int16_t offset = ( (registers[OP2] << 8) >> 16); 
             int8_t codReg = registers[OP2] && 0b11111;
             registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
             readFromMemory(registers, mainMemory);
@@ -637,7 +636,7 @@ void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
 }
 
 //Funcion MUL
-void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
 
     valor = a * b;
@@ -759,7 +758,10 @@ void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
 
 }
 
-
+//Funcion STOP
+void STOP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    registers[IP] = -1;
+}
 
 
 void main(int argc,char* argv[]){
