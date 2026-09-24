@@ -51,6 +51,8 @@ typedef enum {
 
 #define MAXMEMORY 16384
 
+#define NUM_SEGMENTOS 2
+
 #define H2Bt 0xFFFF0000//Constantes para tomar los 2 bytes más significativos y los 2 menos significativos.
 #define L2Bt 0x0000FFFF 
 
@@ -120,7 +122,10 @@ void setRegisters(int32_t registers[32],int16_t cSize){
 //Funcion para obtener la direccion fisica a partir de la logica.
 int32_t getDir(int32_t logicDir,int32_t listSegments[]){
     int lowByte=logicDir & L2Bt;
-    int highByte=logicDir & H2Bt;
+    int highByte=(logicDir>>16) & H2Bt;
+    if(highByte>=NUM_SEGMENTOS || listSegments[highByte]==-1 ){
+        //error: segmento invalido
+    }
     int base=listSegments[highByte] & H2Bt;
     return (lowByte+base);
 }
@@ -138,7 +143,7 @@ int32_t getOp(int tipo, int8_t *mainMemory,int rindex){
 
 
 //Funcion que obtiene el valor de un operando y lo devuelve
-int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers){
+int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     int8_t tipo = operando >> 24;
     int32_t valor=0;
 
@@ -153,8 +158,8 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers){
         case '3': //operando de memoria;
             int16_t offset = (registers[OP2] & 0x00FFFF00) >> 8;
             int8_t codReg = registers[OP2] & 0b11111;
-            registers[MAR] = (4 << 16) + (getDir(registers[codreg])+ offset); 
-            readFromMemory(regsiters, mainMemory);
+            registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
+            readFromMemory(registers, mainMemory);
             valor = (registers[MBR]);
     }
 
@@ -163,17 +168,17 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers){
 
 
 //Funcion que guarda en el operando 1 un valor proveniente de una operacion.
-void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers){
-    tipo = registers[OP1] >> 24;
+void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t tipo = registers[OP1] >> 24;
     switch (tipo) {
         case '1': //Operando de registro
-            codReg = registers[OP1] & 0b11111;
+            int8_t codReg = registers[OP1] & 0b11111;
             registers[codReg] = valor;
             break;
         case '3': //operando de memoria
             int16_t offset = (registers[OP2] & 0x00FFFF00) >> 8;
             int8_t codReg = registers[OP2] & 0b11111;
-            registers[MAR] = (4 << 16) + (getDir(registers[codreg])+ offset); 
+            registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
             registers[MBR] = valor;
             loadInMemory(registers,mainMemory);
     }
@@ -269,8 +274,9 @@ void readFromMemory(int32_t *registers, int8_t mainMemory){
 //Funcion SYS
 void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     int op=registers[OP2] & 0x00FFFFFF;
+    int i;
     char *auxS;
-    int32_t aux=registers[ECX]&2LBt, tam=(registers[ECX]&H2Bt)>>16;
+    int32_t aux=registers[ECX]&L2Bt, tam=(registers[ECX]&H2Bt)>>16;
     registers[LAR]=registers[EDX];
     registers[MAR]=(registers[ECX]&H2Bt) + getDir(registers[LAR],listSegments);
 
@@ -450,11 +456,11 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
 
 //Funcion JMP
 void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
-    int8_t tipo = registers[OP2] >>> 24; //leo el tipo de operando, que es su byte mas significativo, OP1 no guarda su tipo??
+    int8_t tipo = registers[OP2] >> 24; //leo el tipo de operando, que es su byte mas significativo, OP1 no guarda su tipo??
     //el OP1 deberia guardar en su byte mas significativo, no lo hace el getOP?
     switch (tipo){ //debo hacer desplazamiento logico o aritmetico? o da igual?
         case '1': //operando de registro
-            int8_t codReg = registers[OP2] & 0b11111  //int8_t o solo int?
+            int8_t codReg = registers[OP2] & 0b11111;  //int8_t o solo int?
             registers[IP] =  registers[registers[codReg]];
             break;
         case '2': //operando inmediato
@@ -462,10 +468,10 @@ void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
             registers[IP] = valor; //debo validar que no se salga del code segment?
             break;
         case '3': //operando de memoria
-            int16_t offset = ( (registers[OP2] << 8) >>> 16); //saco el codigo de operando con el <<8
+            int16_t offset = ( (registers[OP2] << 8) >> 16); //saco el codigo de operando con el <<8
             int8_t codReg = registers[OP2] && 0b11111;
-            registers[MAR] = (4 << 16) + (getDir(registers[codreg])+ offset); 
-            readFromMemory(regsiters, mainMemory);
+            registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
+            readFromMemory(registers, mainMemory);
             registers[IP] = (registers[MBR]);
     }
 
@@ -474,21 +480,21 @@ void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
 
 //Funcion LOAD DATA LOW
 void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]) {
-    valor = getValorOpnd(registers[OP2], mainMemory, registers);
-    valor = valor & FFFF;
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+    valor = valor & 0xFFFF;
     
-    tipo = registers[OP1] >> 24;
+    int8_t tipo = registers[OP1] >> 24;
 
     switch (tipo) {
         case '1': 
-            codReg = registers[OP1] & 0b11111;
+            int8_t codReg = registers[OP1] & 0b11111;
             registers[codReg] &= valor; //sobrescribe los 2 bits menos significativos
             break;
         case '3': //operando de memoria
-            offset = (registers[OP1] & 0xFFFF00)>>8;
+            int16_t offset = (registers[OP1] & 0xFFFF00)>>8;
             codReg = registers[OP1] & 0b11111;
             registers[MBR] &= valor;
-            registers[MAR] = (4 << 16) + (getDir(registers[codreg])+ offset); 
+            registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
             loadInMemory(registers,mainMemory);
     }
 }
@@ -496,21 +502,21 @@ void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]) {
 
 //Funcion LOAD DATA HIGH
 void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]) {
-    valor = getValorOpnd(registers[OP2], mainMemory, registers);
-    valor = valor & FFFF;
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+    valor = valor & 0xFFFF;
     
-    tipo = registers[OP1] >> 24;
+    int32_t tipo = registers[OP1] >> 24;
 
     switch (tipo) {
         case '1': 
-            codReg = registers[OP1] & 0b11111;
+            int8_t codReg = registers[OP1] & 0b11111;
          registers[codReg] &= (valor<<16) + 0xFFFF; //sobrescribe los 2 bits menos significativos
             break;
         case '3': //operando de memoria
-            offset = (registers[OP1] & 0xFFFF00)>>8;
+            int16_t offset = (registers[OP1] & 0xFFFF00)>>8;
             codReg = registers[OP1] & 0b11111;
             registers[MBR] &= (valor<<16) + 0xFFFF;
-            registers[MAR] = (4 << 16) + (getDir(registers[codreg])+ offset); 
+            registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
             loadInMemory(registers,mainMemory);
     }
 
@@ -519,10 +525,10 @@ void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]) {
 
 //Funcion MOV
 void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
-    valor = getValorOpnd(registers[OP2], mainMemory, registers);
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
 
-    tipo = registers[OP1] >> 24;
-    writeInOp1(valor, mainMemory, registers);
+    int32_t tipo = registers[OP1] >> 24;
+    writeInOp1(valor, mainMemory, registers,listSegments);
     setCC(OP_MOV,0,0,valor,registers);
 }
 
@@ -588,43 +594,86 @@ void JNZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
 void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     int8_t tipo = registers[OP2] >> 24;
     int aux;
+    int8_t codReg;
 
     switch (tipo) {
         case '1': //operando de registro
-            int16_t codReg = registers[OP2] & 0b11111; //obtengo el codigo
-            int16_t registers[codReg] = ~(registers[codReg]);
+            codReg = registers[OP2] & 0b11111; //obtengo el codigo
+            registers[codReg] = ~(registers[codReg]);
             break;
         case '3': //operando de memoria;
             int16_t offset = (registers[OP2] & 0x00FFFF00) >> 8;
-            int8_t codReg = registers[OP2] & 0b11111;
-            registers[MAR] = (4 << 16) + (getDir(registers[codreg])+ offset); 
-            readFromMemory(regsiters, mainMemory);
+            codReg = registers[OP2] & 0b11111;
+            registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
+            readFromMemory(registers, mainMemory);
             registers[MBR] = ~(registers[MBR]);
             loadInMemory(registers,mainMemory);
     }
+    int32_t valor=registers[codReg];
     setCC(OP_NOT,0,0,valor,registers);
 }
 
 
 //Funcion ADD
 void ADD(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers), b = getValorOpnd(registers[OP2], mainMemory, registers);
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
 
-    valor = a + b
+    valor = a + b;
 
-    writeInOp1(valor, mainMemory, registers);
+    writeInOp1(valor, mainMemory, registers,listSegments);
 
     setCC(OP_ADD,a,b,valor,registers);
+}
+
+//Funcion SUB
+void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+
+    valor = a - b;
+
+    writeInOp1(valor, mainMemory, registers,listSegments);
+
+    setCC(OP_SUB,a,b,valor,registers);
+}
+
+//Funcion MUL
+void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+
+    valor = a * b;
+
+    writeInOp1(valor, mainMemory, registers,listSegments);
+
+    setCC(OP_MUL,a,b,valor,registers);
+}
+
+//Funcion DIV
+void DIV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+    if(b==0){
+        //error: division por 0 (invocar stop?)
+    }
+    else{
+
+        valor = a / b;
+
+        registers[AC]=a%b; //guardo resto de division entera en AC
+
+        writeInOp1(valor, mainMemory, registers,listSegments);
+        
+
+        setCC(OP_DIV,a,b,valor,registers);
+    }
 }
 
 
 //Funcion XOR
 void XOR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers), b = getValorOpnd(registers[OP2], mainMemory, registers);
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
 
-    valor = a ^ b
+    valor = a ^ b;
 
-    writeInOp1(valor, mainMemory, registers);
+    writeInOp1(valor, mainMemory, registers,listSegments);
 
     setCC(OP_XOR,a,b,valor,registers);
 }
@@ -637,8 +686,84 @@ void SWAP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     XOR(mainMemory, registers, listSegments);
 }
 
+//---Shifters---
 
-void main(){
+//Funcion SHL
+void SHL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    uint32_t valor;
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+    valor=a<<b;
+    writeInOp1(valor, mainMemory, registers,listSegments);
+    setCC(OP_SHL,a,b,valor,registers);
+
+}
+
+//Funcion SHR
+void SHR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    uint32_t valor; //al ser unsigned, el shift agrega 0 por izquierda
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+    valor=(uint32_t)a>>b;
+    writeInOp1(valor, mainMemory, registers,listSegments);
+    setCC(OP_SHR,a,b,valor,registers);
+
+}
+//Funcion SAR
+void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+    valor=a>>b; //como aca valor es signed, propaga el signo normalmente
+    writeInOp1(valor, mainMemory, registers,listSegments);
+    setCC(OP_SAR,a,b,valor,registers);
+
+}
+
+//Fin Shifters
+
+//Funcion RND
+void RND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+    valor=rand() % (b+1);
+    writeInOp1(valor, mainMemory, registers,listSegments);
+
+}
+
+//Funcion CMP
+void CMP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+    valor=a-b;
+    setCC(OP_CMP,a,b,valor,registers);
+
+
+}
+
+//Funcion AND
+void AND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+
+    valor = a & b;
+
+    writeInOp1(valor, mainMemory, registers,listSegments);
+
+    setCC(OP_AND,a,b,valor,registers);
+
+}
+
+//Funcion OR
+void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
+
+    valor = a | b;
+
+    writeInOp1(valor, mainMemory, registers,listSegments);
+
+    setCC(OP_OR,a,b,valor,registers);
+
+}
+
+
+
+
+void main(int argc,char* argv[]){
+    srand(time(NULL)); //inicializa semilla al iniciar programa
     int16_t cSize=0;
     int32_t registers[32]={0}; //serian los 32 registros de 4 bytes que se piden (aunque solo se usen 17 por ahora)
     int32_t listSegments[8]={0}; //serian los 8 segmentos de 4 bytes que se piden
