@@ -159,7 +159,7 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
             int16_t offset = (registers[OP2] >> 8) & L2Bt;
             int8_t codReg = registers[OP2] & 0b11111;
             registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
-            readFromMemory(registers, mainMemory);
+            readFromMemory(registers, mainMemory,listSegments);
             valor = (registers[MBR]);
     }
 
@@ -180,7 +180,7 @@ void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t li
             int8_t codReg = registers[OP2] & 0b11111;
             registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
             registers[MBR] = valor;
-            loadInMemory(registers,mainMemory);
+            loadInMemory(registers,mainMemory,listSegments);
     }
 
 }
@@ -245,8 +245,9 @@ void intToString(char *auxS, int numero) {
 
 
 //Funcion que carga una variable cargada en MBR a memoria dependiendo del MAR. 
-void loadInMemory(int32_t *registers, int8_t mainMemory){
+void loadInMemory(int32_t *registers, int8_t mainMemory,int32_t listSegments[]){
     int i;
+    registers[MAR]+=getDir(registers[LAR],listSegments);
     int opSize = (registers[MAR] >>16) & L2Bt;
     int dir = registers[MAR] & L2Bt;
     uint32_t aux = registers[MBR];
@@ -259,8 +260,9 @@ void loadInMemory(int32_t *registers, int8_t mainMemory){
 
 
 //Funcion que lee una variable de la memoria y la carga en el MBR dependiendo del MAR. 
-void readFromMemory(int32_t *registers, int8_t mainMemory){
+void readFromMemory(int32_t *registers, int8_t mainMemory,int32_t listSegments[]){
     int i;
+    registers[MAR]+=getDir(registers[LAR],listSegments);
     int opSize = (registers[MAR] >>16) &L2Bt;
     int dir = registers[MAR] & L2Bt;
 
@@ -278,7 +280,7 @@ void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     char *auxS;
     int32_t aux=registers[ECX]&L2Bt, tam=(registers[ECX]>>16)&L2Bt;
     registers[LAR]=registers[EDX];
-    registers[MAR]=(registers[ECX]&H2Bt) + getDir(registers[LAR],listSegments);
+    registers[MAR]=(registers[ECX]&H2Bt);
 
     if(op==1){
         switch (registers[EAX])
@@ -286,28 +288,28 @@ void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
         case 1:
             for (i=0;i<aux;i++){
                 scanf(" %d",&registers[MBR]);
-                loadInMemory(registers,mainMemory);
+                loadInMemory(registers,mainMemory,listSegments);
                 registers[MAR]+=i*tam;
             }    
         break;
         case 2:
             for (i=0;i<aux;i++){
                     scanf(" %c",&registers[MBR]);
-                    loadInMemory(registers,mainMemory);
+                    loadInMemory(registers,mainMemory,listSegments);
                     registers[MAR]+=i*tam;
             }
         break;
         case 4:
             for (i=0;i<aux;i++){
                 scanf(" %o",&registers[MBR]);
-                loadInMemory(registers,mainMemory);
+                loadInMemory(registers,mainMemory,listSegments);
                 registers[MAR]+=i*tam;
             }
         break;
         case 8:
             for (i=0;i<aux;i++){
                 scanf(" %x",&registers[MBR]);
-                loadInMemory(registers,mainMemory);
+                loadInMemory(registers,mainMemory,listSegments);
                 registers[MAR]+=i*tam;
             }
         break;
@@ -315,7 +317,7 @@ void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
             for (i=0;i<aux;i++){
                 scanf(" %s",auxS);
                 registers[MBR]=(int32_t)stringToInt(auxS);
-                loadInMemory(registers,mainMemory);
+                loadInMemory(registers,mainMemory,listSegments);
                 registers[MAR]+=i*tam;
             }
         break;
@@ -326,35 +328,35 @@ void Sys (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
         {
         case 1:
             for (i=0;i<aux;i++){
-                readFromMemory(registers,mainMemory);
+                readFromMemory(registers,mainMemory,listSegments);
                 printf(" %d",registers[MBR]);
                 registers[MAR]+=i*tam;
             }    
         break;
         case 2:
             for (i=0;i<aux;i++){
-                readFromMemory(registers,mainMemory);
+                readFromMemory(registers,mainMemory,listSegments);
                     printf(" %c",registers[MBR]);
                     registers[MAR]+=i*tam;
             }
         break;
         case 4:
             for (i=0;i<aux;i++){
-                readFromMemory(registers,mainMemory);
+                readFromMemory(registers,mainMemory,listSegments);
                 printf(" %o",registers[MBR]);
                 registers[MAR]+=i*tam;
             }
         break;
         case 8:
             for (i=0;i<aux;i++){
-                readFromMemory(registers,mainMemory);
+                readFromMemory(registers,mainMemory,listSegments);
                 printf(" %x",registers[MBR]);
                 registers[MAR]+=i*tam;
             }
         break;
         case 10:
             for (i=0;i<aux;i++){
-                readFromMemory(registers,mainMemory);
+                readFromMemory(registers,mainMemory,listSegments);
                 intToString(auxS,registers[MBR]);
                 printf("%s",auxS);
                 registers[MAR]+=i*tam;
@@ -470,7 +472,7 @@ void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
             int16_t offset = ( (registers[OP2] << 8) >> 16) & L2Bt; 
             int8_t codReg = registers[OP2] && 0b11111;
             registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
-            readFromMemory(registers, mainMemory);
+            readFromMemory(registers, mainMemory,listSegments);
             registers[IP] = (registers[MBR]);
     }
 
@@ -494,7 +496,7 @@ void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]) {
             codReg = registers[OP1] & 0b11111;
             registers[MBR] &= valor;
             registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
-            loadInMemory(registers,mainMemory);
+            loadInMemory(registers,mainMemory,listSegments);
     }
 }
 
@@ -516,7 +518,7 @@ void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[]) {
             codReg = registers[OP1] & 0b11111;
             registers[MBR] &= (valor<<16) + 0xFFFF;
             registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
-            loadInMemory(registers,mainMemory);
+            loadInMemory(registers,mainMemory,listSegments);
     }
 
 }
@@ -604,9 +606,9 @@ void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
             int16_t offset = (registers[OP2] >> 8) &L2Bt;
             codReg = registers[OP2] & 0b11111;
             registers[MAR] = (4 << 16) + (getDir(registers[codReg],listSegments)+ offset); 
-            readFromMemory(registers, mainMemory);
+            readFromMemory(registers, mainMemory,listSegments);
             registers[MBR] = ~(registers[MBR]);
-            loadInMemory(registers,mainMemory);
+            loadInMemory(registers,mainMemory,listSegments);
     }
     int32_t valor=registers[codReg];
     setCC(OP_NOT,0,0,valor,registers);
@@ -650,7 +652,7 @@ void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
 void DIV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments), b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments);
     if(b==0){
-        printf("Error: DIV por 0")
+        printf("Error: DIV por 0");
     }
     else{
 
