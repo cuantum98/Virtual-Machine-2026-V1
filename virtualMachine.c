@@ -540,56 +540,32 @@ void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 
 //Funcion LOAD DATA LOW
 void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag) {
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
+    printf(", \t\t");
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor = valor & 0xFFFF;
-    
-    int8_t tipo = (registers[OP1] >> 24) & 0x000000FF;
-
-    switch (tipo) {
-        case '1': 
-            int8_t codReg = registers[OP1] & 0b11111;
-            registers[codReg] &= valor; //sobrescribe los 2 bits menos significativos
-            break;
-        case '3': //operando de memoria
-            int16_t offset = (registers[OP1] >>8)& L2Bt;
-            codReg = registers[OP1] & 0b11111;
-            registers[MBR] &= valor;
-            registers[LAR] = registers[codReg] + offset;
-            registers[MAR] = (4 << 16); 
-            loadInMemory(registers,mainMemory,listSegments);
-    }
+    a &= 0xFFFF0000 + valor;
+    writeInOp1(a, mainMemory, registers, listSegments);
 }
 
 
 //Funcion LOAD DATA HIGH
 void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag) {
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
+    printf(", \t\t");
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor = valor & 0xFFFF;
-    
-    int32_t tipo = (registers[OP1] >> 24)&0x000000FF;
-
-    switch (tipo) {
-        case '1': 
-            int8_t codReg = registers[OP1] & 0b11111;
-            registers[codReg] &= (valor<<16) + 0xFFFF; //sobrescribe los 2 bits menos significativos
-            break;
-        case '3': //operando de memoria
-            int16_t offset = (registers[OP1] >> 8)&L2Bt;
-            codReg = registers[OP1] & 0b11111;
-            registers[MBR] &= (valor<<16) + 0xFFFF;
-            registers[LAR] = registers[codReg] + offset;
-            registers[MAR] = (4 << 16); 
-            loadInMemory(registers,mainMemory,listSegments);
-    }
-
+    a &= (valor<<16) + 0xFFFF;
+    writeInOp1(a, mainMemory, registers, listSegments);
 }
 
 
 //Funcion MOV
 void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
+    printf(", \t\t");
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
 
-    int32_t tipo = (registers[OP1] >> 24)&0x000000FF;
     writeInOp1(valor, mainMemory, registers,listSegments);
     setCC(OP_MOV,0,0,valor,registers);
 }
