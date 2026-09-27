@@ -165,14 +165,20 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
         printf("ARCHIVO INVALIDO");
     }
     else{
+
         int32_t ultinst;
-        flagD = argv[2];
+        if (argv[2]){
+            flagD = argv[2];
+        }
+        else{
+            flagD="a";
+        }
+        
         //Se cargan las variables del archivo y se setean los arrays.
         loadCodeSize(arch, &cSize);
         loadCode(arch, cSize, mainMemory);
         setRegisters(registers);
         setSegments(listSegments, cSize);
-
         flagaux = (strcmp(flagD,"-d")==0)? 1:0;
         
         while (registers[IP] != -1){
@@ -180,7 +186,7 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
             readNextInst(mainMemory, registers, listSegments);
             if (registers[OPC]<=31 && registers[OPC]>=0){
                 if (flagaux){
-                    printf("[%04x]   %08x       |    %-8s",(int16_t)getDir(ultinst,listSegments), registers[OPC], opndNames[registers[OPC]]);
+                    printf("[%04x]   %08x    |   %-8s",(int16_t)getDir(ultinst,listSegments), mainMemory[getDir(ultinst,listSegments)], opndNames[registers[OPC]]);
                 }
                 op[registers[OPC]](mainMemory, registers, listSegments, flagaux);
                 printf("\n");
@@ -739,56 +745,57 @@ void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 //FUNCIONES JUMP CONDICIONALES --------------------- !!
 void JN(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    if (!((registers[CC] & 0x80000000)>>31)){
+    if (((registers[CC] & 0x80000000)>>31) & L2Bt){
         JMP(mainMemory,registers,listSegments, flag);
 }
 }
 
 
 void JP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    if (((registers[CC] & 0xC0000000)>>30) == 0){
+    if ((((registers[CC] & 0xC0000000)>>30) & L2Bt) == 0){
         JMP(mainMemory,registers,listSegments, flag);
     }
 }
 
 
 void JZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    if (!((registers[CC] & 0x40000000)>>30)){
+    if (((registers[CC] & 0x40000000)>>30) & L2Bt){
         JMP(mainMemory,registers,listSegments, flag);
     }
 }
 
 
 void JC(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    if (!((registers[CC] & 0x20000000)>>29)){
+    if (((registers[CC] & 0x20000000)>>29) & L2Bt){
         JMP(mainMemory,registers,listSegments, flag);
     }
 }
 
 
 void JV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    if (!((registers[CC] & 0x10000000)>>28)){
+    if (((registers[CC] & 0x10000000)>>28) & L2Bt){
         JMP(mainMemory,registers,listSegments, flag);
     }
 }
 
 
 void JNP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    if ((!((registers[CC] & 0x80000000)>>31)) || (!((registers[CC] & 0x40000000)>>30))){
+    if ((((registers[CC] & 0x80000000)>>31) & L2Bt) || (((registers[CC] & 0x40000000)>>30) & L2Bt)){
         JMP(mainMemory,registers,listSegments, flag);
     }
 }
 
 
 void JNN(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    if ((registers[CC] & 0x80000000)>>31){
+    if ((((registers[CC] & 0x80000000)>>31) & L2Bt) == 0){
         JMP(mainMemory,registers,listSegments, flag);
     }
 }
 
 
 void JNZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    if ((registers[CC] & 0x40000000)>>30){
+    printf("CODIGO CC = %04x", registers[CC]>>30);
+    if ((((registers[CC] & 0x40000000)>>30) & L2Bt) == 0){
         JMP(mainMemory,registers,listSegments, flag);
     }
 }
