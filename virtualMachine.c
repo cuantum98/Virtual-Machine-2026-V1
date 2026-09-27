@@ -686,10 +686,9 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
 //Funcion JMP
 void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
-    int salto=registers[IP] & H2Bt + valor;
 
-    if (getSegmentSize(registers[IP],listSegments) > (salto) && (listSegments[registers[IP]>>16 & L2Bt]>>16 & L2Bt) < salto){
-        registers[IP] &= H2Bt + valor;
+    if ((getSegmentSize(registers[IP],listSegments) > valor) && (listSegments[(registers[IP]>>16) & L2Bt]>>16 & L2Bt) < valor){
+        registers[IP] =valor;
     }
     else{
         printf("Salto fuera de segmento");
