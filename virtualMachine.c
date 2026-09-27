@@ -689,11 +689,11 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
 void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
 
-    if ((getSegmentSize(registers[IP],listSegments) > valor) && (listSegments[(registers[IP]>>16) & L2Bt]>>16 & L2Bt) < valor){
-        registers[IP] =valor;
+    if (((listSegments[(registers[CS] >> 16) & L2Bt] & L2Bt) > valor) &&  (valor>=0)){
+        registers[IP] =(registers[IP] & H2Bt)+valor;
     }
     else{
-        printf("Salto fuera de segmento");
+        printf("Salto fuera del segmento de codigo");
         STOP(mainMemory, registers, listSegments, flag);
     }
 }
