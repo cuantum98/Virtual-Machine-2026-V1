@@ -159,8 +159,6 @@ int main(int argc,char* argv[]){
         return 1;
     }
 
-   
-
     FILE * arch = fopen(argv[1], "rb");
 
     if (!verifyFile(arch)){
@@ -305,7 +303,7 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
 
     switch (tipo) {
         case '1':{ //operando de registro
-            codReg = registers[OP2] & 0b11111; //obtengo el codigo
+            codReg = operando & 0b11111; //obtengo el codigo
             valor = registers[codReg];
             if (flag){
                 printf("[%s]",registersNames[codReg]);
@@ -314,15 +312,15 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
             break;
         }
         case '2':{ //operando inmediato
-            valor = registers[OP2] & 0xFFFF;
+            valor = operando & 0xFFFF;
             if (flag){
                 printf("%-8d", valor);
             }
             break;
         }
         case '3': { //operando de memoria;
-            offset = (registers[OP2] >> 8) & L2Bt;
-            codReg = registers[OP2] & 0b11111;
+            offset = (operando >> 8) & L2Bt;
+            codReg = operando & 0b11111;
             if (flag){
                 if (offset == 0){
                     printf("[%s]",registersNames[codReg]);
@@ -358,8 +356,8 @@ void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t li
             break;
         }
         case 3:{ //operando de memoria
-            offset = (int16_t) ((registers[OP2] >>8) & L2Bt);
-            codReg = registers[OP2] & 0b11111;
+            offset = (int16_t) ((registers[OP1] >>8) & L2Bt);
+            codReg = registers[OP1] & 0b11111;
             registers[LAR]=registers[codReg] + offset;
             registers[MAR] = (4 << 16); 
             registers[MBR] = valor;
@@ -689,7 +687,9 @@ void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 //Funcion LOAD DATA LOW
 void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag) {
     int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
-    printf(", \t\t");
+    if (flag){
+        printf(", \t\t");
+    }
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor = valor & 0xFFFF;
     a &= 0xFFFF0000 + valor;
@@ -700,7 +700,9 @@ void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 //Funcion LOAD DATA HIGH
 void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag) {
     int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
-    printf(", \t\t");
+    if (flag){
+        printf(", \t\t");
+    }
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor = valor & 0xFFFF;
     a &= (valor<<16) + 0xFFFF;
@@ -711,12 +713,15 @@ void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 //Funcion MOV
 void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
     int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
-    printf(", \t\t");
+    if (flag){
+        printf(", \t\t");
+    }
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
 
     writeInOp1(valor, mainMemory, registers,listSegments);
     setCC(OP_MOV,0,0,valor,registers);
 }
+
 
 //FUNCIONES JUMP CONDICIONALES --------------------- !!
 void JN(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
@@ -876,7 +881,7 @@ void XOR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion SWAP
-void SWAP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag){
     int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
     if (flag){
         printf(", \t\t");
