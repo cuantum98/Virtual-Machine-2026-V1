@@ -887,8 +887,13 @@ void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int fl
         printf(", \t\t");
     }
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
-    int32_t aux, tipo;
 
+
+    int32_t aux, tipo;
+    int8_t codReg;
+    int16_t offset;
+
+    
     aux = a;
     a = b;
     b = aux;
@@ -898,12 +903,15 @@ void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int fl
 
     switch (tipo) {
         case '1': //Operando de registro
-            int8_t codReg = registers[OP2] & 0b11111;
+
+            codReg = registers[OP2] & 0b11111;
+
             registers[codReg] = b;
             break;
         case '3': //operando de memoria
-            int16_t offset = (registers[OP2] >>8) & L2Bt;
-            int8_t codReg = registers[OP2] & 0b11111;
+            offset = (registers[OP2] >>8) & L2Bt;
+            codReg = registers[OP2] & 0b11111;
+
             registers[LAR]=registers[codReg] + offset;
             registers[MAR] = (4 << 16); 
             registers[MBR] = b;
