@@ -176,7 +176,7 @@ int main(int argc,char* argv[]){
         
         while (registers[IP] != -1){
             readNextInst(mainMemory, registers, listSegments);
-            if (registers[OPC]<=31 && registers[OPC]>0){
+            if (registers[OPC]<=31 && registers[OPC]>=0){
                 if (flagaux){
                     printf("[%04x]   %08x       |    %-8s",(int16_t)getDir(registers[IP],listSegments), registers[OPC], opndNames[registers[OPC]]);
                 }
@@ -243,8 +243,7 @@ void setSegments(int32_t listSegments[], int16_t cSize){
     //por ahora solo hay 2 segmentos (cs y ds) se inicializan en 0 y 1 respectivamente
     int i=2;
     listSegments[0]=cSize;
-    listSegments[1]=cSize; 
-    listSegments[1]=listSegments[1] << 16;     //Sumo a 0 los 2 bytes más significativos, luego hago un shif left de 2 bytes 
+    listSegments[1]=(cSize<<16);
     listSegments[1]+= (MAXMEMORY - cSize);     //y sumo los bytes menos significativos 
 
     while (i < 8){
@@ -282,7 +281,7 @@ int32_t getDir(int32_t logicDir, int32_t listSegments[]){
         //error: segmento invalido
     }
     else{
-        int base=listSegments[highByte] & H2Bt;
+        int base=(listSegments[highByte]<<16) & L2Bt;
         return (lowByte+base);
     }
 }
@@ -339,11 +338,12 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
                     }
                 }
             }
-        }
+        
             registers[LAR] = registers[codReg] + offset;
             registers[MAR] = (4 << 16); 
             readFromMemory(registers, mainMemory,listSegments);
             valor = (registers[MBR]);
+        }
     }
     return valor;
 }
@@ -503,7 +503,7 @@ void readFromMemory(int32_t *registers, int8_t *mainMemory,int32_t listSegments[
 
 //Funcion SYS
 void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int op=registers[OP2] & 0x00FFFFFF;
+    int op = registers[OP2] & 0x00FFFFFF;
     int i;
     char auxS[33];
     int32_t aux=registers[ECX]&L2Bt, tam=(registers[ECX]>>16)&L2Bt;
@@ -697,7 +697,7 @@ void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     }
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor = valor & 0xFFFF;
-    a &= 0xFFFF0000 + valor;
+    a =(a& 0xFFFF0000) | valor;
     writeInOp1(a, mainMemory, registers, listSegments);
 }
 
@@ -709,15 +709,13 @@ void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
         printf(", \t");
     }
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
-    valor = valor & 0xFFFF;
-    a &= (valor<<16) + 0xFFFF;
+    a = (a&0x0000FFFF) + (valor<<16);
     writeInOp1(a, mainMemory, registers, listSegments);
 }
 
 
 //Funcion MOV
 void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
     if (flag){
         printf(", \t");
     }
@@ -976,7 +974,7 @@ void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 //Funcion RND
 void RND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
+    int32_t valor;
     if (flag){
         printf(", \t");
     }
