@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 
 // Son todas las operaciones con las que trabajamos, es necesario para calcular el CC.
@@ -54,19 +55,144 @@ typedef enum {
 #define NUM_SEGMENTOS 2
 
 #define H2Bt 0xFFFF0000//Constantes para tomar los 2 bytes más significativos y los 2 menos significativos.
-#define L2Bt 0x0000FFFF 
+#define L2Bt 0x0000FFFF
+void loadCodeSize(FILE *file, int16_t *cSize);
 
+void loadCode(FILE *file, int16_t cSize, int8_t *mainMemory);
 
-//funcion que verifica si el archivo es valido, devuelve true si lo es y false si no lo es.
-// Ademas cierra el archivo en caso de que no sea valido.
+void setSegments(int32_t listSegments[], int16_t cSize);
+
+void setRegisters(int32_t registers[32]);
+
+int getSegmentSize(int32_t reg, int32_t *listSegments);
+
+int32_t getDir(int32_t logicDir, int32_t listSegments[]);
+
+int32_t getOp(int tipo, int8_t *mainMemory, int rindex);
+
+int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers, int32_t listSegments[]);
+
+void readNextInst(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]);
+
+int stringToInt(char *bin);
+
+void loadInMemory(int32_t *registers, int8_t *mainMemory, int32_t listSegments[]);
+
+void readFromMemory(int32_t *registers, int8_t *mainMemory, int32_t listSegments[]);
+
+void SYS(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *registers);
+
+void JMP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void LDL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void LDH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void MOV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void JN(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void JP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void JZ(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void JC(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void JV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void JNP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void JNN(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void JNZ(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void NOT(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void ADD(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void SUB(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void MUL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void DIV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void XOR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void SHL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void SHR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void SAR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void RND(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void CMP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void AND(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+
+void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag);
+
+void STOP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag);
+
+void INVALID(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag);
+
+void main(int argc,char* argv[]){
+    srand(time(NULL)); //inicializa semilla al iniciar programa
+    int16_t cSize = 0;
+    int32_t registers[32]={0}; //serian los 32 registros de 4 bytes que se piden (aunque solo se usen 17 por ahora)
+    int32_t listSegments[8]={0}; //serian los 8 segmentos de 4 bytes que se piden
+    int8_t mainMemory[16384]={0}; //seria la memoria principal de 16kib
+    char *flagD, *opndNames[32]= {"SYS","JMP","JP","JN","JZ","JC","JV","JNP","JNN","JNZ","NOT"," "," "," "," ","STOP","MOV","ADD","SUB","MUL","DIV","CMP","AND","OR","XOR","SWAP","SHL","SHR","SAR","LDL","LDH","RND"};
+    int flagaux;
+
+    //VECTORES A FUNCIONES 0, 1 y 2 operandos.
+    void (*op[32])(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag)={SYS, JMP, JP, JN, JZ, JC, JV, JNP,JNN, JNZ, NOT, INVALID, INVALID, INVALID, INVALID, STOP, MOV, ADD, SUB, MUL, DIV, CMP, AND, OR, XOR, SWAP, SHL, SHR, SAR, LDL, LDH, RND};
+
+    FILE * arch = fopen(argv[1], "rb");
+
+    if (!verifyFile(arch)){
+        printf("ARCHIVO INVALIDO");
+    }
+    else{
+        flagD = argv[2];
+        //Se cargan las variables del archivo y se setean los arrays.
+        loadCodeSize(arch, &cSize);
+        loadCode(arch, cSize, mainMemory);
+        setRegisters(registers);
+        setSegments(listSegments, cSize);
+
+        flagaux = (strcmp(flagD,"-d")==0)? 0:1;
+        
+        while (registers[IP] != -1){
+            readNextInst(mainMemory, registers, listSegments);
+            if (registers[OPC]<=31 && registers[OPC]>0){
+                if (flagaux){
+                    printf("[%x] \t %-8x |    %-8s",(int16_t)getDir(registers[IP],listSegments), registers[OPC], opndNames[registers[OPC]]);
+                }
+                op[registers[OPC]](mainMemory, registers, listSegments, flagaux);
+            }
+            else{
+                printf("ERROR OPERACION INVALIDA");
+                registers[IP]=-1;
+            }
+        }
+        printf("Fin de proceso.");
+        fclose(arch);
+    }
+}
 int verifyFile(FILE *file) {
     char id[6]={0};
     int8_t version;
-    int16_t tamaño;
 
-    if (file == null){
+    if (file == NULL){
         printf("ARCHIVO INEXISTENTE.");
-        return 1
+        return 1;
     }
     if (fread(id, sizeof(char), 5, file)!=5 || strcmp(id,"VMX26")!=0){
         fclose(file);
@@ -114,7 +240,7 @@ void setSegments(int32_t listSegments[], int16_t cSize){
 
 
 //Funcion para inicializar los registros más importantes.
-void setRegisters(int32_t registers[32],int16_t cSize){
+void setRegisters(int32_t registers[32]){
     registers[CS] =0;
     registers[DS] =1;
     registers[DS] = (registers[DS]<<16);
@@ -124,9 +250,9 @@ void setRegisters(int32_t registers[32],int16_t cSize){
 
 
 //Funcion para obtener la ultima posicion de memoria de un segmento determinado por un registro.
-int getSegmentSize(int32_t reg, int32_t *listSegment){
-    int baseCS = (listaSegments[(reg >>16 & L2Bt)] >> 16) & L2Bt;
-    int tamCS = listaSegments[(reg >>16 & L2Bt)] & L2Bt;
+int getSegmentSize(int32_t reg, int32_t *listSegments){
+    int baseCS = (listSegments[(reg >>16 & L2Bt)] >> 16) & L2Bt;
+    int tamCS = listSegments[(reg >>16 & L2Bt)] & L2Bt;
     return baseCS+tamCS;
 }
 
@@ -160,14 +286,15 @@ int32_t getOp(int tipo, int8_t *mainMemory,int rindex){
 //Funcion que obtiene el valor de un operando y lo devuelve
 int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
     int8_t tipo = (operando >> 24) & 0x000000FF;
+    int16_t codReg;
     int32_t valor=0;
     char *registersNames[32] = {"IP","OPC","OP1","OP2","LAR","MAR","MBR"," "," "," ","EAX","EBX","ECX","EDX","EEX","EFX","AC","CC"," "," "," "," "," "," "," "," ","CS","DS"," "," "," "," "};
 
     switch (tipo) {
         case '1': //operando de registro
-            int16_t codReg = registers[OP2] & 0b11111; //obtengo el codigo
+            codReg = registers[OP2] & 0b11111; //obtengo el codigo
             valor = registers[codReg];
-            printf("[%S]",registersNames[codReg]);
+            printf("[%s]",registersNames[codReg]);
             break;
         case '2': //operando inmediato
             valor = registers[OP2] & 0xFFFF;
@@ -175,16 +302,16 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
             break;
         case '3': //operando de memoria;
             int16_t offset = (registers[OP2] >> 8) & L2Bt;
-            int8_t codReg = registers[OP2] & 0b11111;
+            codReg = registers[OP2] & 0b11111;
             if (offset == 0){
-                printf("[%S]",registersNames[codReg]);
+                printf("[%s]",registersNames[codReg]);
             }
             else{
                 if (offset>0){
-                    printf("[%S+%d]",registersNames[codReg],offset);
+                    printf("[%s+%d]",registersNames[codReg],offset);
                 }
                 else{
-                    printf("[%S %d]",registersNames[codReg],offset);
+                    printf("[%s %d]",registersNames[codReg],offset);
                 }
             }
             registers[LAR] = registers[codReg] + offset;
@@ -208,7 +335,7 @@ void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t li
         case '3': //operando de memoria
             int16_t offset = (registers[OP2] >>8) & L2Bt;
             int8_t codReg = registers[OP2] & 0b11111;
-            registers[LAR]=registers[codReg] + offset
+            registers[LAR]=registers[codReg] + offset;
             registers[MAR] = (4 << 16); 
             registers[MBR] = valor;
             loadInMemory(registers,mainMemory,listSegments);
@@ -219,7 +346,7 @@ void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t li
 
 //Funcion para leer la siguiente instruccion
 void readNextInst(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]){
-    if registers[IP]!=-1{
+    if (registers[IP]!=-1){
         int dir = getDir(registers[IP],listSegments);
         if ((dir != -1) && dir < getSegmentSize(registers[CS], listSegments)){
             int8_t operacion=mainMemory[dir]; //Traigo la operacion del IP
@@ -234,11 +361,11 @@ void readNextInst(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]
         }
         else{
             STOP(mainMemory, registers, listSegments);
-            break;
+            return;
         }
     }
     else{
-        break;
+        return;
     }
 }
 
@@ -246,7 +373,6 @@ void readNextInst(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]
 //funcion auxiliar para pasar un string binario a su valor numerico.
 int stringToInt(char *bin){
     int resultado = 0;
-
     for (int i = 0; bin[i] != '\0'; i++) {
         if (bin[i] == '1') {
             resultado = resultado * 2 + 1;
@@ -288,11 +414,10 @@ void intToString(char *auxS, int numero) {
 
 
 //Funcion que carga una variable cargada en MBR a memoria dependiendo del MAR. 
-void loadInMemory(int32_t *registers, int8_t mainMemory,int32_t listSegments[]){
+void loadInMemory(int32_t *registers, int8_t *mainMemory,int32_t listSegments[]){
     int i;
-    fDir = getDir(registers[LAR],listSegments);
+    int32_t fDir = getDir(registers[LAR],listSegments);
     if(fDir != -1){
-        int 
         if ((fDir + (registers[MAR]>>16)&L2Bt) < getSegmentSize(registers[LAR], listSegments)){
             registers[MAR]+=fDir;
             int opSize = (registers[MAR] >>16) & L2Bt;
@@ -305,19 +430,19 @@ void loadInMemory(int32_t *registers, int8_t mainMemory,int32_t listSegments[]){
         }
         else{
             STOP(mainMemory, registers, listSegments);
-            break;
+            return;
         }
     }
     else{
-        break;
+        return;
     }
 }
 
 
 //Funcion que lee una variable de la memoria y la carga en el MBR dependiendo del MAR. 
-void readFromMemory(int32_t *registers, int8_t mainMemory,int32_t listSegments[]){
+void readFromMemory(int32_t *registers, int8_t *mainMemory,int32_t listSegments[]){
     int i;
-    fDir = getDir(registers[LAR],listSegments);
+    int32_t fDir = getDir(registers[LAR],listSegments);
     if (fDir !=-1){
         if ((fDir + (registers[MAR]>>16)&L2Bt) < getSegmentSize(registers[LAR], listSegments)){
             registers[MAR]+= fDir;
@@ -326,16 +451,17 @@ void readFromMemory(int32_t *registers, int8_t mainMemory,int32_t listSegments[]
 
             for (i=0;i<opSize;i++){
                 registers[MBR] = registers[MBR]<<8;
-                registers[MBR] += mainMemory[dir+i];
+                registers[MBR] += mainMemory[i+dir];
             }
         }
         else{
-            STOP(mainMemory, registers, listSegments);
-            break;
+            printf("Error de segmento");
+            STOP(mainMemory, registers, listSegments,0);
+            return;
         }
     }
     else{
-        break;
+        return;
     }
 }
 
@@ -528,11 +654,11 @@ void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
     int salto=registers[IP] & H2Bt + valor;
 
-    if (getSegmentSize(registers[IP]) > (salto) && (listSegments[registers[IP]>>16 & L2Bt]>>16 & L2Bt) < salto){
+    if (getSegmentSize(registers[IP],listSegments) > (salto) && (listSegments[registers[IP]>>16 & L2Bt]>>16 & L2Bt) < salto){
         registers[IP] &= H2Bt + valor;
     }
     else{
-        printf("SALTO DEL PAPU!");
+        printf("Salto fuera de segmento");
         STOP(mainMemory, registers, listSegments, flag);
     }
 }
@@ -823,47 +949,3 @@ void INVALID(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int 
     STOP(mainMemory, registers, listSegments, flag);
 }
 
-void main(int argc,char* argv[]){
-    srand(time(NULL)); //inicializa semilla al iniciar programa
-    int16_t cSize = 0;
-    int32_t registers[32]={0}; //serian los 32 registros de 4 bytes que se piden (aunque solo se usen 17 por ahora)
-    int32_t listSegments[8]={0}; //serian los 8 segmentos de 4 bytes que se piden
-    int8_t mainMemory[16384]={0}; //seria la memoria principal de 16kib
-    char *flagD, *opndNames[27]= {"SYS","JMP","JP","JN","JZ","JC","JV","JNP","JNN","JNZ","NOT"," "," "," "," ","STOP","MOV","ADD","SUB","MUL","DIV","CMP","AND","OR","XOR","SWAP","SHL","SHR","SAR","LDL","LDH","RND"};
-    int flagaux;
-
-    //VECTORES A FUNCIONES 0, 1 y 2 operandos.
-    void (*op[32])(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag)={SYS, JMP, JP, JN, JZ, JC, JV, JNP,JNN, JNZ, NOT, INVALID, INVALID, INVALID, INVALID, STOP, MOV, ADD, SUB, MUL, DIV, CMP, AND, OR, XOR, SWAP, SHL, SHR, SAR, LDL, LDH, RND};
-
-    FILE * arch = fopen(argv[1], "rb");
-
-    if (!verifyFile(arch)){
-        printf("ARCHIVO INVALIDO");
-    }
-    else{
-        flagD = argv[2];
-        //Se cargan las variables del archivo y se setean los arrays.
-        loadCodeSize(arch, &cSize);
-        loadCode(arch, cSize, mainMemory);
-        setRegisters(registers,cSize);
-        setSegments(listSegments, cSize);
-
-        flagaux = (strcmp(flagD,"-d")==0)? 0:1;
-        
-        while (registers[IP] != -1){
-            readNextInst(mainMemory, registers, listSegments);
-            if (registers[OPC]<=31 && registers[OPC]>0){
-                if (flagaux){
-                    printf("[%x] \t %-8x |    %-8s",(int16_t)getDir(registers[IP],listSegments), registers[OPC], opndNames[registers[OPC]]);
-                }
-                op[registers[OPC]](mainMemory, registers, listSegments, flagaux);
-            }
-            else{
-                printf("ERROR OPERACION INVALIDA");
-                registers[IP]=-1;
-            }
-        }
-        printf("Fin de proceso.");
-        fclose(arch);
-    }
-}
