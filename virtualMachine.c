@@ -178,7 +178,6 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
         while (registers[IP] != -1){
             ultinst=registers[IP];
             readNextInst(mainMemory, registers, listSegments);
-            int32_t ultinst;
             if (registers[OPC]<=31 && registers[OPC]>=0){
                 if (flagaux){
                     printf("[%04x]   %08x       |    %-8s",(int16_t)getDir(ultinst,listSegments), registers[OPC], opndNames[registers[OPC]]);
@@ -419,15 +418,15 @@ int stringToInt(char *bin){
 
 //funcion auxiliar para transformar un numero entero a su representacion binaria como cadena de caracteres.
 void intToString(char *auxS, int numero) {
-    int i = 0;
-    int n = numero;
+    uint32_t i = 0,n=(uint32_t) numero;
+    strcpy(auxS,"");
 
     if (n == 0) {
         auxS[i++] = '0';
     } else {
         while (n != 0) {
             auxS[i++] = (n % 2) + '0';
-            n /= 2;
+            n >>= 1;
         }
     }
 
@@ -485,6 +484,7 @@ void readFromMemory(int32_t *registers, int8_t *mainMemory,int32_t listSegments[
             registers[MAR]+= fDir;
             int opSize = (registers[MAR] >>16) &L2Bt;
             int dir = registers[MAR] & L2Bt;
+            registers[MBR]=0;
 
             for (i=0;i<opSize;i++){
                 registers[MBR] = registers[MBR]<<8;
@@ -506,7 +506,7 @@ void readFromMemory(int32_t *registers, int8_t *mainMemory,int32_t listSegments[
 
 //Funcion SYS
 void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int op = registers[OP2] & 0x00FFFFFF;
+    int op = getValorOpnd(registers[OP2],mainMemory,registers,listSegments,flag);
     int i;
     char auxS[33];
     int32_t aux=registers[ECX]&L2Bt, tam=(registers[ECX]>>16)&L2Bt;
@@ -518,19 +518,20 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
         {
         case 1:
             for (i=0;i<aux;i++){
+                printf("\n");
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 scanf(" %d",&registers[MBR]);
-                printf("\n");
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=tam;
             }    
         break;
         case 2:
             for (i=0;i<aux;i++){
+                    printf("\n");
                     char c;
                     printf("[%04x]:",getDir(registers[LAR],listSegments));
                     scanf(" %c",&c);
-                    printf("\n");
+
                     registers[MBR]=(int32_t)(unsigned char) c;
                     loadInMemory(registers,mainMemory,listSegments);
                     registers[LAR]+=tam;
@@ -538,27 +539,27 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
         break;
         case 4:
             for (i=0;i<aux;i++){
+                printf("\n");
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 scanf(" %o",&registers[MBR]);
-                printf("\n");
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=tam;
             }
         break;
         case 8:
             for (i=0;i<aux;i++){
+                printf("\n");
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 scanf(" %x",&registers[MBR]);
-                printf("\n");
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=tam;
             }
         break;
         case 16:
             for (i=0;i<aux;i++){
+                printf("\n");
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 scanf(" %s",auxS);
-                printf("\n");
                 registers[MBR]=(int32_t)stringToInt(auxS);
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=tam;
@@ -569,6 +570,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     else{
         for (i=0;i<aux;i++){
             readFromMemory(registers,mainMemory,listSegments); // lee UNA vez, deja el valor en MBR
+            printf("\n");
             printf("[%04x]: ",getDir(registers[LAR],listSegments));
             if (registers[EAX] & 0x01){ // bit 0: decimal
                 printf(" %d",registers[MBR]);
@@ -577,16 +579,16 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
                 printf(" %c",registers[MBR]);
             }
             if (registers[EAX] & 0x04){ // bit 2: octal
-                printf(" %o",registers[MBR]);
+                printf(" 0o%o",registers[MBR]);
             }
             if (registers[EAX] & 0x08){ // bit 3: hexadecimal
-                printf(" %x",registers[MBR]);
+                printf("0x %x",registers[MBR]);
             }
             if (registers[EAX] & 0x10){ // bit 4: binario
                 intToString(auxS,registers[MBR]);
-                printf(" %s",auxS);
+                printf("0b %s",auxS);
             }
-            printf("\n");
+            
         
             registers[LAR]+=tam; // avanza UNA sola vez por celda, no por formato
         }
@@ -724,6 +726,7 @@ void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 
 //Funcion MOV
 void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+    int32_t a=getValorOpnd(registers[OP1],mainMemory,registers,listSegments,flag);
     if (flag){
         printf(", \t");
     }
