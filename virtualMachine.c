@@ -144,7 +144,7 @@ void STOP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 
 void INVALID(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag);
 
-int main(int argc,char* argv[]){
+int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
     srand(time(NULL)); //inicializa semilla al iniciar programa
     int16_t cSize = 0;
     int32_t registers[32]={0}; //serian los 32 registros de 4 bytes que se piden (aunque solo se usen 17 por ahora)
@@ -165,6 +165,7 @@ int main(int argc,char* argv[]){
         printf("ARCHIVO INVALIDO");
     }
     else{
+        int32_t ultinst;
         flagD = argv[2];
         //Se cargan las variables del archivo y se setean los arrays.
         loadCodeSize(arch, &cSize);
@@ -175,10 +176,12 @@ int main(int argc,char* argv[]){
         flagaux = (strcmp(flagD,"-d")==0)? 1:0;
         
         while (registers[IP] != -1){
+            ultinst=registers[IP];
             readNextInst(mainMemory, registers, listSegments);
+            int32_t ultinst;
             if (registers[OPC]<=31 && registers[OPC]>=0){
                 if (flagaux){
-                    printf("[%04x]   %08x       |    %-8s",(int16_t)getDir(registers[IP],listSegments), registers[OPC], opndNames[registers[OPC]]);
+                    printf("[%04x]   %08x       |    %-8s",(int16_t)getDir(ultinst,listSegments), registers[OPC], opndNames[registers[OPC]]);
                 }
                 op[registers[OPC]](mainMemory, registers, listSegments, flagaux);
                 printf("\n");
@@ -276,12 +279,12 @@ int32_t getDir(int32_t logicDir, int32_t listSegments[]){
     int lowByte=logicDir & L2Bt;
     int highByte=(logicDir>>16) & L2Bt;
     if(highByte>=NUM_SEGMENTOS || listSegments[highByte]==-1 ){
-        printf("ERROR: INDICE DE SEGMENTO NO VALIDO");
+        printf("ERROR: INDICE DE SEGMENTO INVALIDO");
         return -1;
         //error: segmento invalido
     }
     else{
-        int base=(listSegments[highByte]<<16) & L2Bt;
+        int base=(listSegments[highByte]>>16) & L2Bt;
         return (lowByte+base);
     }
 }
@@ -517,6 +520,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             for (i=0;i<aux;i++){
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 scanf(" %d",&registers[MBR]);
+                printf("\n");
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=tam;
             }    
@@ -526,7 +530,8 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
                     char c;
                     printf("[%04x]:",getDir(registers[LAR],listSegments));
                     scanf(" %c",&c);
-                    registers[MBR]=(int32_t) c;
+                    printf("\n");
+                    registers[MBR]=(int32_t)(unsigned char) c;
                     loadInMemory(registers,mainMemory,listSegments);
                     registers[LAR]+=tam;
             }
@@ -535,6 +540,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             for (i=0;i<aux;i++){
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 scanf(" %o",&registers[MBR]);
+                printf("\n");
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=tam;
             }
@@ -543,6 +549,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             for (i=0;i<aux;i++){
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 scanf(" %x",&registers[MBR]);
+                printf("\n");
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=tam;
             }
@@ -551,6 +558,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             for (i=0;i<aux;i++){
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 scanf(" %s",auxS);
+                printf("\n");
                 registers[MBR]=(int32_t)stringToInt(auxS);
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=tam;
@@ -561,23 +569,24 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     else{
         for (i=0;i<aux;i++){
             readFromMemory(registers,mainMemory,listSegments); // lee UNA vez, deja el valor en MBR
-        
+            printf("[%04x]: ",getDir(registers[LAR],listSegments));
             if (registers[EAX] & 0x01){ // bit 0: decimal
-                printf("[%04x]: %d",getDir(registers[LAR],listSegments),registers[MBR]);
+                printf(" %d",registers[MBR]);
             }
             if (registers[EAX] & 0x02){ // bit 1: caracteres
-                printf("[%04x]: %c",getDir(registers[LAR],listSegments),registers[MBR]);
+                printf(" %c",registers[MBR]);
             }
             if (registers[EAX] & 0x04){ // bit 2: octal
-                printf("[%04x]: %o",getDir(registers[LAR],listSegments),registers[MBR]);
+                printf(" %o",registers[MBR]);
             }
             if (registers[EAX] & 0x08){ // bit 3: hexadecimal
-                printf("[%04x]: %x",getDir(registers[LAR],listSegments),registers[MBR]);
+                printf(" %x",registers[MBR]);
             }
             if (registers[EAX] & 0x10){ // bit 4: binario
                 intToString(auxS,registers[MBR]);
-                printf("[%04x]: %s",getDir(registers[LAR],listSegments),auxS);
+                printf(" %s",auxS);
             }
+            printf("\n");
         
             registers[LAR]+=tam; // avanza UNA sola vez por celda, no por formato
         }
