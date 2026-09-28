@@ -197,9 +197,9 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
 
                     }
                     printf("|   %-8s",opndNames[registers[OPC]]);
+                    printf("\n");
                 }
                 op[registers[OPC]](mainMemory, registers, listSegments, flagaux);
-                printf("\n");
             }
             else{
                 printf("ERROR OPERACION INVALIDA");
@@ -242,7 +242,13 @@ int verifyFile(FILE *file) {
 
 //funcion que carga el tamaño del codigo en la variable size.
 void loadCodeSize(FILE *file, int16_t *cSize) {
-    fread(cSize, sizeof(int16_t), 1, file);
+    uint8_t b[2];
+    if (fread(b, 1, 2, file) != 2) {
+        *cSize = 0;
+        printf("Cabecera invalida");
+        return;
+    }
+    *cSize = (int16_t)((b[0] << 8) | b[1]);
 }
 
 
