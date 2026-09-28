@@ -624,34 +624,37 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
     N = (resultado < 0) ? 1 : 0;
     Z = (resultado == 0) ? 1 : 0;
 
-    // C y V dependen de la operación
+    // C y V dependen de la operaciÃ³n
     switch (op) {
         case OP_ADD: {
-            uint64_t suma = (uint64_t)(uint32_t)a + (uint64_t)(uint32_t)b;
-            C = (suma > 0xFFFFFFFF) ? 1 : 0;
-            V = (((a ^ resultado) & (b ^ resultado)) >> 31) & 1;
+            uint64_t suma = (int32_t)a + (int32_t)b;
+
+            C = (((suma >> 32) & L2Bt)==0)? 0 : 1;
+
+            V = ((int64_t)(suma) != ((int32_t)(a+b)));
             break;
         }
 
         case OP_SUB:
         case OP_CMP: {
-            C = ((uint32_t)a < (uint32_t)b) ? 1 : 0;
-            V = (((a ^ b) & (a ^ resultado)) >> 31) & 1;
+            uint64_t resta = (int32_t)a - (int32_t)b;
+
+            C = (((resta >> 32) & L2Bt)==0)? 0 : 1;
+
+            V = ((int64_t)(resta) != ((int32_t)(a-b)));
             break;
         }
 
         case OP_MUL: {
-            int64_t prod = (int64_t)a * (int64_t)b;
-            C = (prod != (int64_t)(int32_t)prod) ? 1 : 0;
-            V = C;
+            uint64_t prod = (int32_t)a * (int32_t)b;
+            C = (((prod >> 32) & L2Bt)==0)? 0 : 1;
+
+            V = ((int64_t)(prod) != ((int32_t)(a*b)));
             break;
         }
 
         case OP_DIV: {
-            if (b == 0) {
-                C = 0;
-                V = 1;
-            } else if (a == INT32_MIN && b == -1) {
+            if (a == INT32_MIN && b == -1) {
                 C = 0;
                 V = 1;
             } else {
@@ -662,28 +665,21 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
         }
 
         case OP_SHL: {
-            if (b > 0 && b <= 32) {
-                C = ((uint32_t)a >> (32 - b)) & 1;
-                V = ((a >> 31) != (resultado >> 31)) ? 1 : 0;
-            } else {
-                C = 0;
-                V = 0;
-            }
+            uint64_t shift = (int32_t)a << (int32_t)b;
+
+            C = (((shift >> 32) & L2Bt)==0)? 0 : 1;
+            V = ((int64_t)(shift) != ((int32_t)(a << b)));
             break;
         }
 
         case OP_SHR: {
-            if (b > 0 && b <= 32) {
-                C = ((uint32_t)a >> (b - 1)) & 1;
-            }
+            C = 0;
             V = 0;
             break;
         }
 
         case OP_SAR: {
-            if (b > 0 && b <= 32) {
-                C = ((uint32_t)a >> (b - 1)) & 1;
-            }
+            C=0;
             V = 0;
             break;
         }
@@ -922,7 +918,7 @@ void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int fl
         printf(", \t");
     }
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
-    writeInOp(registers[OP1],a, mainMemory, registers, listSegments);
+    writeInOp(registers[OP1],b, mainMemory, registers, listSegments);
     writeInOp(registers[OP2],a,mainMemory,registers,listSegments);
     setCC(OP_XOR, a ^ b, a, b, registers);
 }
