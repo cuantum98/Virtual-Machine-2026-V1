@@ -197,9 +197,11 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
 
                     }
                     printf("|   %-8s",opndNames[registers[OPC]]);
-                    printf("\n");
                 }
                 op[registers[OPC]](mainMemory, registers, listSegments, flagaux);
+                if(flagaux){
+                    printf("\n");
+                }
             }
             else{
                 printf("ERROR OPERACION INVALIDA");
