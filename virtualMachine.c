@@ -56,6 +56,9 @@ typedef enum {
 
 #define H2Bt 0xFFFF0000//Constantes para tomar los 2 bytes más significativos y los 2 menos significativos.
 #define L2Bt 0x0000FFFF
+#define H4Bt 0xFFFFFFFF00000000
+#define L4Bt 0x00000000FFFFFFFF
+
 int verifyFile(FILE *file);
 
 void loadCodeSize(FILE *file, int16_t *cSize);
@@ -627,68 +630,63 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
     // C y V dependen de la operaciÃ³n
     switch (op) {
         case OP_ADD: {
-            uint64_t suma = (int32_t)a + (int32_t)b;
+            uint64_t sumaC = (uint64_t)(uint32_t)a + (uint64_t)(uint32_t)b;
+            int64_t sumaV = (int64_t)a+(int64_t)b;
 
-            C = (((suma >> 32) & L2Bt)==0)? 0 : 1;
+            C = (((sumaC >> 32) & L4Bt)!=0);
 
-            V = ((int64_t)(suma) != ((int32_t)(a+b)));
+            V = (sumaV != (int32_t)sumaV);
             break;
         }
 
         case OP_SUB:
         case OP_CMP: {
-            uint64_t resta = (int32_t)a - (int32_t)b;
+            uint64_t restaC = (uint64_t)(uint32_t)a + (uint64_t)(~(uint32_t)b+1);
+            int64_t restaV = (int64_t)a - (int64_t)b;
 
-            C = (((resta >> 32) & L2Bt)==0)? 0 : 1;
+            C = ((restaC>>32)&L4Bt)!=0;
 
-            V = ((int64_t)(resta) != ((int32_t)(a-b)));
+            V = (restaV != (int32_t)restaV);
             break;
         }
 
         case OP_MUL: {
-            uint64_t prod = (int32_t)a * (int32_t)b;
-            C = (((prod >> 32) & L2Bt)==0)? 0 : 1;
+            uint64_t prodC = (uint64_t)(uint32_t)a *(uint64_t)(uint32_t)b;
+            int64_t prodV=(int64_t)a * (int64_t)b;
+            C = (((prodC >> 32) & L4Bt)!=0);
 
-            V = ((int64_t)(prod) != ((int32_t)(a*b)));
+            V = ((prodV) != ((int32_t)prodV));
             break;
         }
 
         case OP_DIV: {
-            if (a == INT32_MIN && b == -1) {
-                C = 0;
-                V = 1;
-            } else {
-                C = 0;
-                V = 0;
+            C=0;
+            if(a==INT32_MIN && b==-1){
+                V=1;
+            }
+            else{
+                V=0;
             }
             break;
         }
 
         case OP_SHL: {
-            uint64_t shift = (int32_t)a << (int32_t)b;
+            uint64_t shiftC = (uint64_t)(uint32_t)a << (uint64_t)(uint32_t)b;
+            int64_t shiftV= (int64_t)a << (int64_t)b;
 
-            C = (((shift >> 32) & L2Bt)==0)? 0 : 1;
-            V = ((int64_t)(shift) != ((int32_t)(a << b)));
+            C = (((shiftC >> 32) & L4Bt)!=0);
+            V = ((shiftV) != ((int32_t)(shiftV)));
             break;
         }
 
-        case OP_SHR: {
-            C = 0;
-            V = 0;
-            break;
-        }
-
-        case OP_SAR: {
-            C=0;
-            V = 0;
-            break;
-        }
-
+        case OP_SHR:
+        case OP_SAR:
+        case OP_NOT:
         case OP_MOV:
         case OP_AND:
         case OP_OR:
         case OP_XOR:
-        case OP_NOT:
+
         case OP_SWAP:
             C = 0;
             V = 0;
@@ -816,9 +814,9 @@ void JNZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 //Funcion NOT
 void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
-    valor = ~valor;
-    writeInOp(registers[OP2],valor, mainMemory, registers, listSegments);
-    setCC(OP_NOT,0,0,valor,registers);
+    int32_t resultado = ~valor;
+    writeInOp(registers[OP2],resultado, mainMemory, registers, listSegments);
+    setCC(OP_NOT,valor,0,resultado,registers);
 }
 
 
@@ -846,7 +844,7 @@ void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
     }
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
 
-    valor = a - b;
+    valor = a + (~(uint32_t)b+1);
 
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
@@ -872,20 +870,20 @@ void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 //Funcion DIV
 void DIV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
+    int32_t valor=-1, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
     if (flag){
         printf(", \t");
     }
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+        int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
         if(b==0){
-        printf("ERROR: DIVISION POR 0 NO EVALUADA");
-        STOP(mainMemory, registers, listSegments, flag);
-    }
+            printf("ERROR: DIVISION POR 0 NO EVALUADA");
+            STOP(mainMemory, registers, listSegments, flag);
+        }
     else{
-
-        valor = a / b;
-
-        registers[AC]=a%b; //guardo resto de division entera en AC
+        if(a!=INT32_MIN && b!=-1){
+            valor = a / b;        
+            registers[AC]=a%b;
+         } //guardo resto de division entera en AC
 
         writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
         
