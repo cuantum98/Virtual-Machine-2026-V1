@@ -56,6 +56,9 @@ typedef enum {
 
 #define H2Bt 0xFFFF0000//Constantes para tomar los 2 bytes más significativos y los 2 menos significativos.
 #define L2Bt 0x0000FFFF
+#define H4Bt 0xFFFFFFFF00000000
+#define L4Bt 0x00000000FFFFFFFF
+
 int verifyFile(FILE *file);
 
 void loadCodeSize(FILE *file, int16_t *cSize);
@@ -74,7 +77,7 @@ int32_t getOp(int tipo, int8_t *mainMemory, int rindex);
 
 int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
 
-void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers, int32_t listSegments[]);
+void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[]);
 
 void readNextInst(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]);
 
@@ -193,13 +196,15 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
                     int32_t tipob= (ultinst >> 6) & 0b11;
                     printf("[%04x]  ",(int16_t)Fultinst);
                     for(int i=0;i<1+tipoa+tipob;i++){
-                        printf("%02X   ",(uint8_t) mainMemory[Fultinst+i]);
+                        printf("%02X    ",(uint8_t) mainMemory[Fultinst+i]);
 
                     }
-                    printf("\t|   %-8s",opndNames[registers[OPC]]);
+                    printf("|   %-8s",opndNames[registers[OPC]]);
                 }
                 op[registers[OPC]](mainMemory, registers, listSegments, flagaux);
-                printf("\n");
+                if(flagaux){
+                    printf("\n");
+                }
             }
             else{
                 printf("ERROR OPERACION INVALIDA");
@@ -211,6 +216,7 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
     }
     return 0;
 }
+
 
 //Funcion que verifica si el archivo es valido para su lectura.
 int verifyFile(FILE *file) {
@@ -241,7 +247,13 @@ int verifyFile(FILE *file) {
 
 //funcion que carga el tamaño del codigo en la variable size.
 void loadCodeSize(FILE *file, int16_t *cSize) {
-    fread(cSize, sizeof(int16_t), 1, file);
+    uint8_t b[2];
+    if (fread(b, 1, 2, file) != 2) {
+        *cSize = 0;
+        printf("Cabecera invalida");
+        return;
+    }
+    *cSize = (int16_t)((b[0] << 8) | b[1]);
 }
 
 
@@ -327,7 +339,7 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
             codReg = operando & 0b11111; //obtengo el codigo
             valor = registers[codReg];
             if (flag){
-                printf("[%s]",registersNames[codReg]);
+                printf("%s",registersNames[codReg]);
             }
             
             break;
@@ -367,22 +379,22 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
 
 
 //Funcion que guarda en el operando 1 un valor proveniente de una operacion.
-void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
-    int32_t tipo = (registers[OP1] >> 24) & 0X000000FF;
+void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+    int32_t tipo = (operando >> 24) & 0X0000000F;
     int8_t codReg;
     int16_t offset;
     switch (tipo) {
         case 1:{ //Operando de registro
-            codReg = registers[OP1] & 0b11111;
+            codReg = operando & 0b11111;
             registers[codReg] = valor;
             break;
         }
         case 3:{ //operando de memoria
             offset = (int16_t) ((registers[OP1] >>8) & L2Bt);
-            codReg = registers[OP1] & 0b11111;
+            codReg = operando & 0b11111;
             registers[LAR]=registers[codReg] + offset;
             registers[MAR] = (4 << 16); 
-            registers[MBR] = (int32_t) valor;
+            registers[MBR] = valor;
             loadInMemory(registers,mainMemory,listSegments);
         }
     }
@@ -394,7 +406,7 @@ void writeInOp1(int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t li
 void readNextInst(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]){
     if (registers[IP]!=-1){
         int dir = getDir(registers[IP],listSegments);
-        if ((dir != -1) && dir < getSegmentSize(registers[CS], listSegments)){
+        if ((dir != -1) && dir <= getSegmentSize(registers[CS], listSegments)){
             int8_t operacion=mainMemory[dir]; //Traigo la operacion del IP
             registers[OPC]= operacion & 0b11111; //Obtengo codigo de operacion
             int32_t tipoa= (operacion >> 4) & 0b11; //tipo operando A
@@ -473,7 +485,7 @@ void loadInMemory(int32_t *registers, int8_t *mainMemory,int32_t listSegments[])
             int32_t aux = registers[MBR];
             for (i=opSize-1;i>=0;i--){
                 mainMemory[dir+i]=(int8_t)(aux & 0xFF);
-                aux = aux >> 8;
+                aux = aux>>8;
             }
         }
         else{
@@ -503,7 +515,7 @@ void readFromMemory(int32_t *registers, int8_t *mainMemory,int32_t listSegments[
 
             for (i=0;i<opSize;i++){
                 registers[MBR] = registers[MBR]<<8;
-                registers[MBR] += (int8_t) mainMemory[i+dir];
+                registers[MBR] +=(uint8_t) mainMemory[i+dir];
             }
         }
         else{
@@ -527,7 +539,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     int32_t aux=registers[ECX]&L2Bt, tam=(registers[ECX]>>16)&L2Bt;
     registers[LAR]=registers[EDX];
     registers[MAR]=(registers[ECX]&H2Bt);
-    printf("\n");
+
     if(op==1){
         switch (registers[EAX])
         {
@@ -579,29 +591,31 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
         }
     }
     else{
-        for (i=0;i<aux;i++){
-            readFromMemory(registers,mainMemory,listSegments); // lee UNA vez, deja el valor en MBR
-            printf("[%04x]: ",getDir(registers[LAR],listSegments));
-            if (registers[EAX] & 0x01){ // bit 0: decimal
-                printf(" %d",registers[MBR]);
-            }
-            if (registers[EAX] & 0x02){ // bit 1: caracteres
-                printf(" %c",registers[MBR]);
-            }
-            if (registers[EAX] & 0x04){ // bit 2: octal
-                printf(" 0o%o",registers[MBR]);
-            }
-            if (registers[EAX] & 0x08){ // bit 3: hexadecimal
-                printf(" 0x%x",registers[MBR]);
-            }
-            if (registers[EAX] & 0x10){ // bit 4: binario
-                intToString(auxS,registers[MBR]);
-                printf(" 0b%s",auxS);
-            }
-            printf("\n");
+        if(op == 2){
+            for (i=0;i<aux;i++){
+                readFromMemory(registers,mainMemory,listSegments); // lee UNA vez, deja el valor en MBR
+                printf("\n[%04x]: ",getDir(registers[LAR],listSegments));
+                if (registers[EAX] & 0x01){ // bit 0: decimal
+                    printf(" %d",registers[MBR]);
+                }
+                if (registers[EAX] & 0x02){ // bit 1: caracteres
+                    printf(" %c",registers[MBR]);
+                }
+                if (registers[EAX] & 0x04){ // bit 2: octal
+                    printf(" 0o%o",registers[MBR]);
+                }
+                if (registers[EAX] & 0x08){ // bit 3: hexadecimal
+                    printf(" 0x%x",registers[MBR]);
+                }
+                if (registers[EAX] & 0x10){ // bit 4: binario
+                    intToString(auxS,registers[MBR]);
+                    printf(" 0b%s",auxS);
+                }
+                printf("\n");
+
             
-        
-            registers[LAR]+=tam; // avanza UNA sola vez por celda, no por formato
+                registers[LAR]+=tam; // avanza UNA sola vez por celda, no por formato
+            }
         }
     }
 }
@@ -615,75 +629,66 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
     N = (resultado < 0) ? 1 : 0;
     Z = (resultado == 0) ? 1 : 0;
 
-    // C y V dependen de la operación
+    // C y V dependen de la operaciÃ³n
     switch (op) {
         case OP_ADD: {
-            uint64_t suma = (uint64_t)(uint32_t)a + (uint64_t)(uint32_t)b;
-            C = (suma > 0xFFFFFFFF) ? 1 : 0;
-            V = (((a ^ resultado) & (b ^ resultado)) >> 31) & 1;
+            uint64_t sumaC = (uint64_t)(uint32_t)a + (uint64_t)(uint32_t)b;
+            int64_t sumaV = (int64_t)a+(int64_t)b;
+
+            C = (((sumaC >> 32) & L4Bt)!=0);
+
+            V = (sumaV != (int32_t)sumaV);
             break;
         }
 
         case OP_SUB:
         case OP_CMP: {
-            C = ((uint32_t)a < (uint32_t)b) ? 1 : 0;
-            V = (((a ^ b) & (a ^ resultado)) >> 31) & 1;
+            uint64_t restaC = (uint64_t)(uint32_t)a + (uint64_t)(~(uint32_t)b+1);
+            int64_t restaV = (int64_t)a - (int64_t)b;
+
+            C = ((restaC>>32)&L4Bt)!=0;
+
+            V = (restaV != (int32_t)restaV);
             break;
         }
 
         case OP_MUL: {
-            int64_t prod = (int64_t)a * (int64_t)b;
-            C = (prod != (int64_t)(int32_t)prod) ? 1 : 0;
-            V = C;
+            uint64_t prodC = (uint64_t)(uint32_t)a *(uint64_t)(uint32_t)b;
+            int64_t prodV=(int64_t)a * (int64_t)b;
+            C = (((prodC >> 32) & L4Bt)!=0);
+
+            V = ((prodV) != ((int32_t)prodV));
             break;
         }
 
         case OP_DIV: {
-            if (b == 0) {
-                C = 0;
-                V = 1;
-            } else if (a == INT32_MIN && b == -1) {
-                C = 0;
-                V = 1;
-            } else {
-                C = 0;
-                V = 0;
+            C=0;
+            if(a==INT32_MIN && b==-1){
+                V=1;
+            }
+            else{
+                V=0;
             }
             break;
         }
 
         case OP_SHL: {
-            if (b > 0 && b <= 32) {
-                C = ((uint32_t)a >> (32 - b)) & 1;
-                V = ((a >> 31) != (resultado >> 31)) ? 1 : 0;
-            } else {
-                C = 0;
-                V = 0;
-            }
+            uint64_t shiftC = (uint64_t)(uint32_t)a << (uint64_t)(uint32_t)b;
+            int64_t shiftV= (int64_t)a << (int64_t)b;
+
+            C = (((shiftC >> 32) & L4Bt)!=0);
+            V = ((shiftV) != ((int32_t)(shiftV)));
             break;
         }
 
-        case OP_SHR: {
-            if (b > 0 && b <= 32) {
-                C = ((uint32_t)a >> (b - 1)) & 1;
-            }
-            V = 0;
-            break;
-        }
-
-        case OP_SAR: {
-            if (b > 0 && b <= 32) {
-                C = ((uint32_t)a >> (b - 1)) & 1;
-            }
-            V = 0;
-            break;
-        }
-
+        case OP_SHR:
+        case OP_SAR:
+        case OP_NOT:
         case OP_MOV:
         case OP_AND:
         case OP_OR:
         case OP_XOR:
-        case OP_NOT:
+
         case OP_SWAP:
             C = 0;
             V = 0;
@@ -719,7 +724,7 @@ void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor = valor & 0xFFFF;
     a =(a& 0xFFFF0000) | valor;
-    writeInOp1(a, mainMemory, registers, listSegments);
+    writeInOp(registers[OP1],a, mainMemory, registers, listSegments);
 }
 
 
@@ -731,7 +736,7 @@ void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     }
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     a = (a&0x0000FFFF) + (valor<<16);
-    writeInOp1(a, mainMemory, registers, listSegments);
+    writeInOp(registers[OP1],a, mainMemory, registers, listSegments);
 }
 
 
@@ -743,7 +748,7 @@ void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
     }
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
 
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_MOV,0,0,valor,registers);
 }
 
@@ -810,9 +815,9 @@ void JNZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 //Funcion NOT
 void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
-    valor = ~valor;
-    writeInOp1(valor, mainMemory, registers, listSegments);
-    setCC(OP_NOT,0,0,valor,registers);
+    int32_t resultado = ~valor;
+    writeInOp(registers[OP2],resultado, mainMemory, registers, listSegments);
+    setCC(OP_NOT,valor,0,resultado,registers);
 }
 
 
@@ -826,7 +831,7 @@ void ADD(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
     valor = a + b; //*a = *a +b
 
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
     setCC(OP_ADD,a,b,valor,registers);
 }
@@ -840,9 +845,9 @@ void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
     }
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
 
-    valor = a - b;
+    valor = a + (~(uint32_t)b+1);
 
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
     setCC(OP_SUB,a,b,valor,registers);
 }
@@ -858,7 +863,7 @@ void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
     valor = a * b;
 
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
     setCC(OP_MUL,a,b,valor,registers);
 }
@@ -866,22 +871,21 @@ void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 //Funcion DIV
 void DIV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
+    int32_t valor=0, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
     if (flag){
         printf(", \t");
     }
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+        int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
         if(b==0){
-        printf("ERROR: DIVISION POR 0 NO EVALUADA");
-        STOP(mainMemory, registers, listSegments, flag);
-    }
+            printf("ERROR: DIVISION POR 0 NO EVALUADA");
+            STOP(mainMemory, registers, listSegments, flag);
+        }
     else{
+        
+            valor = a / b;
 
-        valor = a / b;
-
-        registers[AC]=a%b; //guardo resto de division entera en AC
-
-        writeInOp1(valor, mainMemory, registers,listSegments);
+            registers[AC]=a%b; //guardo resto de division entera en AC
+        writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
         
 
         setCC(OP_DIV,a,b,valor,registers);
@@ -899,7 +903,7 @@ void XOR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
     valor = a ^ b;
 
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
     setCC(OP_XOR,a,b,valor,registers);
 }
@@ -912,36 +916,9 @@ void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int fl
         printf(", \t");
     }
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
-
-
-    int32_t aux, tipo;
-    int8_t codReg;
-    int16_t offset;
-
-
-    aux = a;
-    a = b;
-    b = aux;
-    writeInOp1(a, mainMemory, registers, listSegments);
-
-    tipo = (registers[OP2] >> 24) & 0xF;
-
-    switch (tipo) {
-        case 1: //Operando de registro
-
-            codReg = registers[OP2] & 0b11111;
-
-            registers[codReg] = b;
-            break;
-        case 3: //operando de memoria
-            offset = (registers[OP2] >>8) & L2Bt;
-            codReg = registers[OP2] & 0b11111;
-
-            registers[LAR]=registers[codReg] + offset;
-            registers[MAR] = (4 << 16); 
-            registers[MBR] = b;
-            loadInMemory(registers,mainMemory,listSegments);
-    }
+    writeInOp(registers[OP1],b, mainMemory, registers, listSegments);
+    writeInOp(registers[OP2],a,mainMemory,registers,listSegments);
+    setCC(OP_XOR, a ^ b, a, b, registers);
 }
 
 
@@ -957,7 +934,7 @@ void SHL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
     }
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor=a<<b;
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SHL,a,b,valor,registers);
 
 }
@@ -972,7 +949,7 @@ void SHR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
     }
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor=(uint32_t)a>>b;
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SHR,a,b,valor,registers);
 
 }
@@ -985,9 +962,10 @@ void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
         printf(", \t");
     }
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
-    valor = a >> b; //como aca valor es signed, propaga el signo normalmente
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    valor=a>>b; //como aca valor es signed, propaga el signo normalmente
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SAR,a,b,valor,registers);
+
 }
 
 //Fin Shifters
@@ -1002,7 +980,7 @@ void RND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     
     valor=rand() % (b+1);
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
 }
 
@@ -1028,7 +1006,7 @@ void AND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor = a & b;
 
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
     setCC(OP_AND,a,b,valor,registers);
 
@@ -1045,7 +1023,7 @@ void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag)
 
     valor = a | b;
 
-    writeInOp1(valor, mainMemory, registers,listSegments);
+    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
     setCC(OP_OR,a,b,valor,registers);
 
