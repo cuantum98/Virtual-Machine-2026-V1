@@ -296,6 +296,8 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
     free(mainMemory);//Libera la memoria principal al finalizar el ciclo
     return 0;
 }
+
+
 //Informa un error de ejecucion, detiene la maquina virtual y marca que termino con error
 void runtimeError(int32_t *registers, const char *msg){
     if (vmError) //Solo se informa el primer error
@@ -304,11 +306,15 @@ void runtimeError(int32_t *registers, const char *msg){
     registers[IP] = -1;
     vmError = 1;
 }
+
+
 //Funcion auxiliar para detectar extension de archivo
 int endsWith(const char *s, const char *suf) {
     size_t ls = strlen(s), lsuf = strlen(suf);
     return ls >= lsuf && _stricmp(s + ls - lsuf, suf) == 0; //_stricmp no distingue mayusculas (solo Windows)
 }
+
+
 //Funcion para cargar los parametros en un struct
 int parseArgs(int argc, char *argv[], VMArgs *args){
     args->vmxPath = NULL;
@@ -353,11 +359,6 @@ int parseArgs(int argc, char *argv[], VMArgs *args){
         args->params = NULL;
     }
     return 1;
-
-
-
-
-
 }
 
 
@@ -492,6 +493,8 @@ void DISASSEMBLER(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]
 }
 //-----------------------------------------------------------------------
 
+
+
 //Funcion que verifica si el archivo es valido para su lectura.
 int verifyFile(FILE *file) {
     char id[6]={0};
@@ -517,6 +520,8 @@ int verifyFile(FILE *file) {
             return version; //Ahora devuelve numero de version
     }
 }
+
+
 //Lee cabecera dependiendo version
 int readHeader(FILE *file, int version, uint16_t *segSize, uint16_t *entrypoint,int32_t memsize){
     uint8_t b[2];
@@ -560,6 +565,8 @@ int readHeader(FILE *file, int version, uint16_t *segSize, uint16_t *entrypoint,
 
     
 }
+
+
 //Configura tabla de segmentos
 int buildSegments(int32_t *listSegments,int32_t *registers,int *segReg,uint16_t *segSize,int32_t memsize){
     int base=0,iseg=0;
@@ -570,7 +577,6 @@ int buildSegments(int32_t *listSegments,int32_t *registers,int *segReg,uint16_t 
             registers[segReg[i]]=iseg<<16;
             base+=tamanio;
             iseg++;
-
         }
         else{
             registers[segReg[i]]=-1;
@@ -584,6 +590,41 @@ int buildSegments(int32_t *listSegments,int32_t *registers,int *segReg,uint16_t 
     }
     return 1;
 }
+
+
+void setParamSegment(int32_t *listSegments, int argc, char *argv[], int8_t *mainMemory, int32_t *registers) {
+    if (argc <= 0 || registers[PS] == -1) {
+        return;
+    }
+    
+    int offset = 0;
+    int stringOffsets[argc];
+    
+    // 1. Guardar todas las cadenas (nombre archivo + parámetros)
+    for (int i = 0; i < argc; i++) {
+        stringOffsets[i] = offset;
+        int len = strlen(argv[i]) + 1;
+        for (int j = 0; j < len; j++) {
+            mainMemory[offset + j] = argv[i][j];
+        }
+        offset += len;
+    }
+    
+    // 2. Guardar arreglo argv con punteros a cada string
+    for (int i = 0; i < argc; i++) {
+        int32_t puntero = (0x0000 << 16) | (stringOffsets[i] & 0xFFFF);
+        
+        mainMemory[offset + 0] = (puntero >> 24) & 0xFF;
+        mainMemory[offset + 1] = (puntero >> 16) & 0xFF;
+        mainMemory[offset + 2] = (puntero >> 8) & 0xFF;
+        mainMemory[offset + 3] = puntero & 0xFF;
+        
+        offset += 4;
+    }
+}
+
+
+
 //Extrae un valor de la pila, devuelve 1 si salio bien y 0 si hubo underflow, guarda en valor el elemento popeado
 int popValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t *valor){
     if(registers[SS] == -1){
@@ -602,12 +643,9 @@ int popValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int
     *valor = registers[MBR];
     registers[SP]+=4; //Se popeo con exito, se mueve el tope
     return 1;
-
-    
-
-
-
 }
+
+
 //Pushea un valor a la pila, devuelve 1 si salio bien y 0 si hubo overflow, guarda en valor el elemento pusheado
 int pushValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t valor){
     if(registers[SS] == -1){
@@ -697,55 +735,157 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
     int16_t codReg;
     int32_t valor=0;
     int16_t offset;
-    
-    switch (tipo) {
-        case 1:{ //operando de registro
-            codReg = operando & 0b11111; //obtengo el codigo
-            valor = registers[codReg];
-            
-            break;
-        }
-        case 2:{ //operando inmediato
-            valor = (int16_t)(operando & 0xFFFF);
-            break;
-        }
-        case 3: { //operando de memoria;
-            offset = (int16_t)((operando >> 8) & L2Bt);
-            codReg = operando & 0b11111;
-            int32_t segmentCode = (registers[codReg] >> 16) & 0xFFFF;
-            int32_t baseOffset = (registers[codReg] & 0xFFFF) + offset;
-            // Formar la dirección lógica: [segmentCode:baseOffset]
-            registers[LAR] = (segmentCode << 16) | (baseOffset & 0xFFFF);
-            registers[MAR] = (4 << 16); 
-            readFromMemory(registers, mainMemory,listSegments);
-            valor = (registers[MBR]);
+    if (flag == 1){
+        switch (tipo) {
+            case 1:{ //operando de registro
+                codReg = operando & 0b11111; //obtengo el codigo
+                valor = registers[codReg];
+
+                break;
+            }
+            case 2:{ //operando inmediato
+                valor = (int16_t)(operando & 0xFFFF);
+                break;
+            }
+            case 3: { //operando de memoria;
+                offset = (int16_t)((operando >> 8) & L2Bt);
+                codReg = operando & 0b11111;
+                int32_t segmentCode = (registers[codReg] >> 16) & 0xFFFF;
+                int32_t baseOffset = (registers[codReg] & 0xFFFF) + offset;
+                // Formar la dirección lógica: [segmentCode:baseOffset]
+                registers[LAR] = (segmentCode << 16) | (baseOffset & 0xFFFF);
+                registers[MAR] = (4 << 16); 
+                readFromMemory(registers, mainMemory,listSegments);
+                valor = (registers[MBR]);
+            }
         }
     }
+    else if (flag == 2){
+        switch (tipo) {
+            case 1:{ //operando de registro
+                codReg = operando & 0b11111;
+                int opndType = (operando >> 5) & 0b11; 
+
+                if (opndType == 0){
+                    valor = registers[codReg];
+                }
+                else if (opndType == 1){
+                    valor = registers[codReg]  & 0xFF;
+                }
+                else if (opndType == 2){
+                    valor = (registers[codReg] >> 8) & 0xFF;
+                }
+                else{
+                    valor = registers[codReg] & L2Bt;
+                }
+
+                break;
+            }
+            case 2:{ //operando inmediato
+                valor = (int16_t)(operando & 0xFFFF);
+                break;
+            }
+            case 3: { //operando de memoria;
+                offset = (int16_t)((operando >> 8) & L2Bt);
+                codReg = operando & 0b11111;
+                int32_t segmentCode = (registers[codReg] >> 16) & 0xFFFF;
+                int32_t baseOffset = (registers[codReg] & 0xFFFF) + offset;
+                // Formar la dirección lógica: [segmentCode:baseOffset]
+
+                registers[LAR] = (segmentCode << 16) | (baseOffset & 0xFFFF);
+
+                int opndType = (operando >> 5) & 0b111; 
+                
+                if (opndType == 0 || opndType == 4){
+                    registers[MAR] = (4 << 16);
+                }
+                else if (opndType == 1){
+                    registers[MAR] = (1 << 16);
+                }
+                else{
+                    registers[MAR] = (2 << 16);
+                }
+
+                readFromMemory(registers, mainMemory,listSegments);
+                valor = (registers[MBR]);
+            }
+        }
+    }
+    
     return valor;
 }
 
 
 //Funcion que guarda en el operando 1 un valor proveniente de una operacion.
-void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
+void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
     int32_t tipo = (operando >> 24) & 0X0000000F;
     int8_t codReg;
     int16_t offset;
-    switch (tipo) {
-        case 1:{ //Operando de registro
-            codReg = operando & 0b11111;
-            registers[codReg] = valor;
-            break;
+    if (flag == 1){
+        switch (tipo) {
+            case 1:{ //Operando de registro
+                codReg = operando & 0b11111;
+                registers[codReg] = valor;
+                break;
+            }
+            case 3:{ //operando de memoria
+                offset = (int16_t)((operando >> 8) & L2Bt);
+                codReg = operando & 0b11111;
+                int32_t segmentCode = (registers[codReg] >> 16) & 0xFFFF;
+                int32_t baseOffset = (registers[codReg] & 0xFFFF) + offset;
+                // Formar la dirección lógica: [segmentCode:baseOffset]
+                registers[LAR] = (segmentCode << 16) | (baseOffset & 0xFFFF);
+                registers[MAR] = (4 << 16); 
+                registers[MBR] = valor;
+                loadInMemory(registers,mainMemory,listSegments);
+            }
         }
-        case 3:{ //operando de memoria
-            offset = (int16_t)((operando >> 8) & L2Bt);
-            codReg = operando & 0b11111;
-            int32_t segmentCode = (registers[codReg] >> 16) & 0xFFFF;
-            int32_t baseOffset = (registers[codReg] & 0xFFFF) + offset;
-            // Formar la dirección lógica: [segmentCode:baseOffset]
-            registers[LAR] = (segmentCode << 16) | (baseOffset & 0xFFFF);
-            registers[MAR] = (4 << 16); 
-            registers[MBR] = valor;
-            loadInMemory(registers,mainMemory,listSegments);
+    }
+    else{
+        switch (tipo) {
+            case 1:{ //Operando de registro
+                codReg = operando & 0b11111;
+
+                int opndType = (operando >> 5) & 0b11; 
+
+                if (opndType == 0){
+                    registers[codReg] = valor;
+                }
+                else if (opndType == 1){
+                    registers[codReg] = (registers[codReg] & 0xFFFFFF00) | (valor & 0xFF);
+                }
+                else if (opndType == 2){
+                    registers[codReg] = (registers[codReg] & 0xFFFF00FF) | ((valor & 0xFF) << 8);
+                }
+                else{
+                    registers[codReg] = (registers[codReg] & 0xFFFF0000) | (valor & L2Bt);
+                }
+
+                break;
+            }
+            case 3:{ //operando de memoria
+                offset = (int16_t)((operando >> 8) & L2Bt);
+                codReg = operando & 0b11111;
+                int32_t segmentCode = (registers[codReg] >> 16) & 0xFFFF;
+                int32_t baseOffset = (registers[codReg] & 0xFFFF) + offset;
+                // Formar la dirección lógica: [segmentCode:baseOffset]
+                registers[LAR] = (segmentCode << 16) | (baseOffset & 0xFFFF);
+                int opndType = (operando >> 5) & 0b111; 
+                
+                if (opndType == 0 || opndType == 4){
+                    registers[MAR] = (4 << 16);
+                    registers[MBR] = valor;
+                }
+                else if (opndType == 1){
+                    registers[MAR] = (1 << 16);
+                    registers[MBR] = valor << 24; // Coloca el valor en el byte más alto
+                }
+                else{
+                    registers[MAR] = (2 << 16);
+                    registers[MBR] = valor << 16; // Coloca el valor en los dos bytes más altos
+                }
+                loadInMemory(registers,mainMemory,listSegments);
+            }
         }
     }
 
