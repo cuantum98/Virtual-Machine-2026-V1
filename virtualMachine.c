@@ -1146,14 +1146,18 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             else{
                 char *auxS[tam + 1];
             }
+            printf("[%04x]:",getDir(registers[LAR],listSegments));
+
             fscanf("%s",auxS);
             int len = strlen(auxS) + 1;
             registers[MAR] = (1 << 16);
+            
             for (i = 0; i < len; i++){
                 registers[MBR] = auxS[i];
                 loadInMemory(registers,mainMemory,listSegments);
                 registers[LAR]+=1;
             }
+            printf("\n");
         break;
 
         case 4:
