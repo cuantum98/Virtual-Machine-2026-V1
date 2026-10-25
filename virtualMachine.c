@@ -1152,16 +1152,15 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             int len = strlen(auxS) + 1;
             registers[MAR] = (1 << 16);
             
-            for (i = 0; i < len; i++){
+            while (i < len && registers[IP]!=-1){
                 registers[MBR] = auxS[i];
                 loadInMemory(registers,mainMemory,listSegments);
-
-                if (registers[IP] == -1){
-                    runtimeError(registers, "ERROR EN LA CARGA DE STRING, ALMACENAMIENTO INSUFICIENTE.");
-                    break;
-                }
                 registers[LAR]+=1;
             }
+
+            if (registers[IP] == -1){
+                    runtimeError(registers, "ERROR EN LA CARGA DE STRING, ALMACENAMIENTO INSUFICIENTE.");
+                }
             printf("\n");
         break;
 
@@ -1169,19 +1168,21 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             char *auxS[4096];
             int i = 0;
             registers[MAR]=(1<<16);
-            while (mainMemory[getDir(registers[LAR],listSegments) +  i] != '\0'){
+            while (mainMemory[getDir(registers[LAR],listSegments) +  i] != '\0' && registers[IP] != -1){
                 readFromMemory(registers,mainMemory,listSegments);
                 auxS[i] = (char)registers[MBR];
                 i += 1;
-                if (registers[IP] == -1){
-                    runtimeError(registers, "ERROR EN LA LECTURA DE STRING, NO SE COMPLETO SU CARGA DEBIDO A ALMACENAMIENTO INSUFICIENTE.");
-                    break;
-                }
                 registers[LAR]+=1;
             }
-            printf("\n[%04x]: ",getDir(registers[LAR],listSegments));
-            auxS[i] = '\0';
-            printf("%s\n", auxS);
+            if (registers[IP] == -1){
+                    runtimeError(registers, "ERROR EN LA LECTURA DE STRING, NO SE COMPLETO SU CARGA DEBIDO A ALMACENAMIENTO INSUFICIENTE.");
+                }
+            else{
+                printf("\n[%04x]: ",getDir(registers[LAR],listSegments));
+                auxS[i] = '\0';
+                printf("%s\n", auxS);
+            }
+
         break;
 
         case 0:
