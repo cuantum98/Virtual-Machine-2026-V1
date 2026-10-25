@@ -1298,7 +1298,7 @@ void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     valor = valor & 0xFFFF;
     a =(a& 0xFFFF0000) | valor;
-    writeInOp(registers[OP1],a, mainMemory, registers, listSegments, flag);
+    writeInOp(registers[OP1],a, mainMemory, registers, listSegments);
 }
 
 
@@ -1307,7 +1307,7 @@ void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
     a = (a & 0x0000FFFF) | ((valor & 0xFFFF) << 16);
-    writeInOp(registers[OP1],a, mainMemory, registers, listSegments, flag);
+    writeInOp(registers[OP1],a, mainMemory, registers, listSegments);
 }
 
 
@@ -1316,7 +1316,7 @@ void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
     int32_t a=getValorOpnd(registers[OP1],mainMemory,registers,listSegments,flag);
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
 
-    writeInOp(registers[OP1],valor, mainMemory, registers,listSegments, flag);
+    writeInOp(registers[OP1],valor, mainMemory, registers, listSegments);
     setCC(OP_MOV,0,0,valor,registers);
 }
 
@@ -1384,7 +1384,7 @@ void JNZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
     int32_t resultado = ~valor;
-    writeInOp(registers[OP2],resultado, mainMemory, registers, listSegments, flag);
+    writeInOp(registers[OP2],resultado, mainMemory, registers, listSegments);
     setCC(OP_NOT,valor,0,resultado,registers);
 }
 
@@ -1397,7 +1397,7 @@ void PUSH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int fl
 void POP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag){
     int32_t valor;
     if (popValue(mainMemory, registers, listSegments, &valor))
-        writeInOp(registers[OP2], valor, mainMemory, registers, listSegments, flag);
+        writeInOp(registers[OP2], valor, mainMemory, registers, listSegments);
 }
 
 //Funcion CALL
