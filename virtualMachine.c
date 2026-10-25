@@ -188,6 +188,10 @@ int getSegmentBase(int32_t reg, int32_t *listSegments);
 
 int getSegmentSize(int32_t reg, int32_t *listSegments);
 
+int setParamSegment(int32_t *listSegments,VMArgs * args, int8_t *mainMemory, int32_t *registers);
+
+int paramSegmentSize(VMArgs *args);
+
 
 
 int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
@@ -232,6 +236,18 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
             return 1;
 
         }
+        if(version==2){
+            int tamPS=paramSegmentSize(&args); 
+            if(tamPS > 0xFFFF){ //Verifico que no se pase de uint16_t (tamaño del arreglo segSize)
+                    printf("PARAMETROS DEMASIADO GRANDES\n");
+                    fclose(arch);
+                    free(mainMemory);
+                    return 1;
+            }
+            segSize[0] = tamPS; //Setea en el registro de tamaños el tamaño de PS  
+
+            
+        }
         if(!buildSegments(listSegments,registers,segReg,segSize,memsize)){
             fclose(arch);
             free(mainMemory);
@@ -244,11 +260,19 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
             int baseKS = getSegmentBase(registers[KS],listSegments);
             loadBytes(arch, segSize[1], mainMemory + baseKS);
         }
+        //Inicializacion Param Segment
+        int32_t argcVal=0, argvVal=-1;
+        if(registers[PS]!=-1){
+            int offArgv = setParamSegment(listSegments, &args, mainMemory, registers);
+            argcVal = args.paramCount + 1;
+            argvVal = (registers[PS] & 0xFFFF0000) | offArgv;
+
+        }
         // Inicialización de la pila: SP al final del SS; se apilan argv, argc y RET
          if (registers[SS] != -1) {
             registers[SP] = registers[SS] + segSize[5];
-            if (!pushValue(mainMemory, registers, listSegments, -1) ||   // argv -1 es un placeholder hasta implemetar -p
-                !pushValue(mainMemory, registers, listSegments, 0)  ||   // argc 0 es un placeholder hasta implementar -p
+            if (!pushValue(mainMemory, registers, listSegments, argvVal) || 
+                !pushValue(mainMemory, registers, listSegments, argcVal)  || 
                 !pushValue(mainMemory, registers, listSegments, -1)) {   // RET
                 fclose(arch);
                 free(mainMemory);
@@ -335,7 +359,7 @@ int parseArgs(int argc, char *argv[], VMArgs *args){
             args->disassemble = 1;
         else if (strncmp(a, "m=", 2) == 0) {
             char *fin;
-            long m = strtol(a + 2, &fin, 10);
+            long m = strtol(a + 2, &fin, 10); //Convierte valor string de la memoria a long, guarda en el puntero doble a char fin la cadena que no se pudo convertir a long
             if (fin == a + 2 || *fin != '\0' || m <= 0 || m > 64)
                 return 0;
             args->memKiB = (int)m;
@@ -592,34 +616,54 @@ int buildSegments(int32_t *listSegments,int32_t *registers,int *segReg,uint16_t 
 }
 
 
-void setParamSegment(int32_t *listSegments, int argc, char *argv[], int8_t *mainMemory, int32_t *registers) {
-    if (argc <= 0 || registers[PS] == -1) {
-        return;
+int setParamSegment(int32_t *listSegments, VMArgs *args, int8_t *mainMemory, int32_t *registers) {
+    if (registers[PS] == -1) {
+        return -1;
     }
-    
+    int basePS = getSegmentBase(registers[PS],listSegments);
     int offset = 0;
-    int stringOffsets[argc];
+    int stringOffsets[args->paramCount+1];
     
     // 1. Guardar todas las cadenas (nombre archivo + parámetros)
-    for (int i = 0; i < argc; i++) {
+    
+    for (int i = 0; i < args->paramCount+1; i++) {
         stringOffsets[i] = offset;
-        int len = strlen(argv[i]) + 1;
+        char *str = (i == 0) ? args->vmxPath : args->params[i - 1];
+        int len = strlen(str)+1;
         for (int j = 0; j < len; j++) {
-            mainMemory[offset + j] = argv[i][j];
+            mainMemory[basePS + offset + j] = str[j];
         }
         offset += len;
     }
     
     // 2. Guardar arreglo argv con punteros a cada string
-    for (int i = 0; i < argc; i++) {
+    int inicioArgv=offset;
+    for (int i = 0; i < args->paramCount + 1; i++) {
         int32_t puntero = (0x0000 << 16) | (stringOffsets[i] & 0xFFFF);
         
-        mainMemory[offset + 0] = (puntero >> 24) & 0xFF;
-        mainMemory[offset + 1] = (puntero >> 16) & 0xFF;
-        mainMemory[offset + 2] = (puntero >> 8) & 0xFF;
-        mainMemory[offset + 3] = puntero & 0xFF;
+        mainMemory[basePS + offset + 0] = (puntero >> 24) & 0xFF;
+        mainMemory[basePS + offset + 1] = (puntero >> 16) & 0xFF;
+        mainMemory[basePS + offset + 2] = (puntero >> 8) & 0xFF;
+        mainMemory[basePS + offset + 3] = puntero & 0xFF;
         
         offset += 4;
+    }
+  return inicioArgv;
+}
+
+int paramSegmentSize(VMArgs *args){
+    int s;
+    if(args->params==NULL)
+        return 0;
+    else{
+        s=strlen(args->vmxPath)+1;
+        for(int i=0;i<args->paramCount;i++){
+            s+=strlen(args->params[i])+1;
+
+        }
+        s+=(args->paramCount+1)*4;
+        return s;
+
     }
 }
 
@@ -735,32 +779,6 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
     int16_t codReg;
     int32_t valor=0;
     int16_t offset;
-    if (flag == 1){
-        switch (tipo) {
-            case 1:{ //operando de registro
-                codReg = operando & 0b11111; //obtengo el codigo
-                valor = registers[codReg];
-
-                break;
-            }
-            case 2:{ //operando inmediato
-                valor = (int16_t)(operando & 0xFFFF);
-                break;
-            }
-            case 3: { //operando de memoria;
-                offset = (int16_t)((operando >> 8) & L2Bt);
-                codReg = operando & 0b11111;
-                int32_t segmentCode = (registers[codReg] >> 16) & 0xFFFF;
-                int32_t baseOffset = (registers[codReg] & 0xFFFF) + offset;
-                // Formar la dirección lógica: [segmentCode:baseOffset]
-                registers[LAR] = (segmentCode << 16) | (baseOffset & 0xFFFF);
-                registers[MAR] = (4 << 16); 
-                readFromMemory(registers, mainMemory,listSegments);
-                valor = (registers[MBR]);
-            }
-        }
-    }
-    else if (flag == 2){
         switch (tipo) {
             case 1:{ //operando de registro
                 codReg = operando & 0b11111;
@@ -770,13 +788,13 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
                     valor = registers[codReg];
                 }
                 else if (opndType == 1){
-                    valor = registers[codReg]  & 0xFF;
+                    valor = (int8_t) (registers[codReg]  & 0xFF);
                 }
                 else if (opndType == 2){
-                    valor = (registers[codReg] >> 8) & 0xFF;
+                    valor = (int8_t) ((registers[codReg] >> 8) & 0xFF);
                 }
                 else{
-                    valor = registers[codReg] & L2Bt;
+                    valor =(int16_t) (registers[codReg] & L2Bt);
                 }
 
                 break;
@@ -810,38 +828,17 @@ int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,in
                 valor = (registers[MBR]);
             }
         }
-    }
+    
     
     return valor;
 }
 
 
 //Funcion que guarda en el operando 1 un valor proveniente de una operacion.
-void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[]){
     int32_t tipo = (operando >> 24) & 0X0000000F;
     int8_t codReg;
     int16_t offset;
-    if (flag == 1){
-        switch (tipo) {
-            case 1:{ //Operando de registro
-                codReg = operando & 0b11111;
-                registers[codReg] = valor;
-                break;
-            }
-            case 3:{ //operando de memoria
-                offset = (int16_t)((operando >> 8) & L2Bt);
-                codReg = operando & 0b11111;
-                int32_t segmentCode = (registers[codReg] >> 16) & 0xFFFF;
-                int32_t baseOffset = (registers[codReg] & 0xFFFF) + offset;
-                // Formar la dirección lógica: [segmentCode:baseOffset]
-                registers[LAR] = (segmentCode << 16) | (baseOffset & 0xFFFF);
-                registers[MAR] = (4 << 16); 
-                registers[MBR] = valor;
-                loadInMemory(registers,mainMemory,listSegments);
-            }
-        }
-    }
-    else{
         switch (tipo) {
             case 1:{ //Operando de registro
                 codReg = operando & 0b11111;
@@ -874,20 +871,17 @@ void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *reg
                 
                 if (opndType == 0 || opndType == 4){
                     registers[MAR] = (4 << 16);
-                    registers[MBR] = valor;
                 }
                 else if (opndType == 1){
                     registers[MAR] = (1 << 16);
-                    registers[MBR] = valor << 24; // Coloca el valor en el byte más alto
                 }
                 else{
                     registers[MAR] = (2 << 16);
-                    registers[MBR] = valor << 16; // Coloca el valor en los dos bytes más altos
                 }
+                registers[MBR]=valor;
                 loadInMemory(registers,mainMemory,listSegments);
             }
         }
-    }
 
 }
 
