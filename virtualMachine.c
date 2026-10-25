@@ -1155,6 +1155,11 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             for (i = 0; i < len; i++){
                 registers[MBR] = auxS[i];
                 loadInMemory(registers,mainMemory,listSegments);
+
+                if (registers[IP] == -1){
+                    runtimeError(registers, "ERROR EN LA CARGA DE STRING, ALMACENAMIENTO INSUFICIENTE.");
+                    break;
+                }
                 registers[LAR]+=1;
             }
             printf("\n");
@@ -1162,13 +1167,17 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 
         case 4:
             char *auxS[4096];
-            int fdir = getDir(registers[LAR],listSegments);
             int i = 0;
             registers[MAR]=(1<<16);
-            while (mainMemory[fdir + i] != '\0'){
+            while (mainMemory[getDir(registers[LAR],listSegments) +  i] != '\0'){
                 readFromMemory(registers,mainMemory,listSegments);
                 auxS[i] = (char)registers[MBR];
                 i += 1;
+                if (registers[IP] == -1){
+                    runtimeError(registers, "ERROR EN LA LECTURA DE STRING, NO SE COMPLETO SU CARGA DEBIDO A ALMACENAMIENTO INSUFICIENTE.");
+                    break;
+                }
+                registers[LAR]+=1;
             }
             printf("\n[%04x]: ",getDir(registers[LAR],listSegments));
             auxS[i] = '\0';
