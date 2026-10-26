@@ -192,6 +192,8 @@ int setParamSegment(int32_t *listSegments,VMArgs * args, int8_t *mainMemory, int
 
 int paramSegmentSize(VMArgs *args);
 
+void descartarLinea();
+
 
 
 int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
@@ -588,6 +590,12 @@ int readHeader(FILE *file, int version, uint16_t *segSize, uint16_t *entrypoint,
 
 
     
+}
+//Descarta lo que quede en la linea de entrada, incluido el '\n'
+void descartarLinea(){
+    int c=getchar();
+    while(c!='\n')
+        c=getchar();
 }
 
 
@@ -1058,13 +1066,14 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
     registers[MAR] = (registers[ECX]&H2Bt);
 
     switch (op){
-        case 1:
+        case 1:{
             switch (registers[EAX]){
                 case 1:
                     for (i=0;i<aux;i++){
                         printf("\n");
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
                         scanf(" %d",&registers[MBR]);
+                        descartarLinea();
                         loadInMemory(registers,mainMemory,listSegments);
                         registers[LAR]+=tam;
                     }    
@@ -1074,7 +1083,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
                             char c;
                             printf("[%04x]:",getDir(registers[LAR],listSegments));
                             scanf(" %c",&c);
-                    
+                            descartarLinea();
                             registers[MBR]=(int32_t)(unsigned char) c;
                             loadInMemory(registers,mainMemory,listSegments);
                             registers[LAR]+=tam;
@@ -1084,6 +1093,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
                     for (i=0;i<aux;i++){
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
                         scanf(" %o",&registers[MBR]);
+                        descartarLinea();
                         loadInMemory(registers,mainMemory,listSegments);
                         registers[LAR]+=tam;
                     }
@@ -1092,6 +1102,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
                     for (i=0;i<aux;i++){
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
                         scanf(" %x",&registers[MBR]);
+                        descartarLinea();
                         loadInMemory(registers,mainMemory,listSegments);
                         registers[LAR]+=tam;
                     }
@@ -1100,15 +1111,18 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
                     for (i=0;i<aux;i++){
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
                         scanf(" %s",auxS);
+                        descartarLinea();
                         registers[MBR]=(int32_t)stringToInt(auxS);
                         loadInMemory(registers,mainMemory,listSegments);
                         registers[LAR]+=tam;
                     }
                 break;
             }
-            break;
 
-        case 2:
+            break;
+        }
+
+        case 2:{
             for (i=0;i<aux;i++){
                     readFromMemory(registers,mainMemory,listSegments); // lee UNA vez, deja el valor en MBR
                     printf("\n[%04x]: ",getDir(registers[LAR],listSegments));
@@ -1133,68 +1147,59 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
                     registers[LAR]+=tam; // avanza UNA sola vez por celda, no por formato
                 }
             break;
+            }
         
-        case 3:
-            tam = registers[ECX];
-            if (tam == -1){
-                char *auxS[4096];
-            }
-            else{
-                char *auxS[tam + 1];
-            }
-            printf("[%04x]:",getDir(registers[LAR],listSegments));
-
-            fscanf("%s",auxS);
-            int len = strlen(auxS) + 1;
-            registers[MAR] = (1 << 16);
-            
-            while (i < len && registers[IP]!=-1){
-                registers[MBR] = auxS[i];
-                loadInMemory(registers,mainMemory,listSegments);
-                registers[LAR]+=1;
-            }
-
-            if (registers[IP] == -1){
-                    runtimeError(registers, "ERROR EN LA CARGA DE STRING, ALMACENAMIENTO INSUFICIENTE.");
+        case 3:{
+                int32_t max = registers[ECX];   // -1: sin limite
+                int c, cant = 0;
+                registers[MAR] = (1 << 16);     // de a 1 byte
+                printf("[%04x]:",getDir(registers[LAR],listSegments));
+                c = getchar();
+                while (c != '\n' && (max == -1 || cant < max) && registers[IP] != -1){
+                    registers[MBR] = c;
+                    loadInMemory(registers,mainMemory,listSegments);
+                    registers[LAR] += 1;
+                    cant++;
+                    c = getchar();
                 }
-            printf("\n");
-        break;
+                while (c != '\n')   // si se corto por ECX, descarta el resto de la linea
+                    c = getchar();
+                if (registers[IP] != -1){       // '\0' final
+                    registers[MBR] = 0;
+                    loadInMemory(registers,mainMemory,listSegments);
+                }
+            break;
+        }
 
-        case 4:
-            char *auxS[4096];
-            int i = 0;
-            registers[MAR]=(1<<16);
-            while (mainMemory[getDir(registers[LAR],listSegments) +  i] != '\0' && registers[IP] != -1){
+        case 4:{
+            registers[MAR] = (1 << 16);     // de a 1 byte
+            readFromMemory(registers,mainMemory,listSegments);
+            while (registers[IP] != -1 && registers[MBR] != 0){
+                putchar((char)registers[MBR]);
+                registers[LAR] += 1;
                 readFromMemory(registers,mainMemory,listSegments);
-                auxS[i] = (char)registers[MBR];
-                i += 1;
-                registers[LAR]+=1;
             }
-            if (registers[IP] == -1){
-                    runtimeError(registers, "ERROR EN LA LECTURA DE STRING, NO SE COMPLETO SU CARGA DEBIDO A ALMACENAMIENTO INSUFICIENTE.");
-                }
-            else{
-                printf("\n[%04x]: ",getDir(registers[LAR],listSegments));
-                auxS[i] = '\0';
-                printf("%s\n", auxS);
-            }
+            break;
+        }
 
-        break;
-
-        case 0:
+        case 0:{
+            fflush(stdout);
             #ifdef _WIN32
                 system("cls");
             #else
                 system("clear");
             #endif
         break;
+        }
 
-        case 15:
+        case 15:{
         break;
-
-        default:
+        }
+        default:{
             runtimeError(registers, "SYS: Operacion invalida");
             break;
+        }
+       
     }
     registers[LAR] = registers[EDX];
 }
