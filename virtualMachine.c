@@ -31,7 +31,11 @@ typedef struct {
     int   paramCount;   // cantidad de params después de -p
     char **params;      // apunta dentro de argv (no hace falta copiar)
 } VMArgs;
-
+typedef struct {
+    char *vmiPath;      // NULL si no se paso .vmi (los SYS F se ignoran)
+    int   memKiB;       // tamaño de la memoria para el header de la imagen
+    int   pasoAPaso;    // 1 si se presiono Enter en el ultimo breakpoint
+} VMContext;
 //Instrucción 
 #define IP   0
 #define OPC  1
@@ -90,7 +94,7 @@ int32_t getDir(int32_t logicDir, int32_t listSegments[]);
 
 int32_t getOp(int tipo, int8_t *mainMemory, int rindex);
 
-int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
 void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *registers,int32_t listSegments[]);
 
@@ -102,73 +106,73 @@ void loadInMemory(int32_t *registers, int8_t *mainMemory, int32_t listSegments[]
 
 void readFromMemory(int32_t *registers, int8_t *mainMemory, int32_t listSegments[]);
 
-void SYS(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void SYS(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
 void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *registers);
 
-void JMP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JMP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void LDL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void LDL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void LDH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void LDH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void MOV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void MOV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void JN(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JN(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void JP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void JZ(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JZ(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void JC(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JC(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void JV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void JNP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JNP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void JNN(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JNN(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void JNZ(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void JNZ(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void NOT(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void NOT(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void ADD(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void ADD(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void SUB(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void SUB(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void MUL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void MUL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void DIV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void DIV(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void XOR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void XOR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void SHL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void SHL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void SHR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void SHR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void SAR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void SAR(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void RND(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void RND(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void CMP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void CMP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void AND(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void AND(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag);
+void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx);
 
-void STOP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag);
+void STOP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx);
 
-void PUSH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void PUSH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void POP (int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void POP (int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void CALL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void CALL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void RET (int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag);
+void RET (int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
 
-void INVALID(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag);
+void INVALID(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx);
 
 void DISASSEMBLER(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]);
 
@@ -194,10 +198,23 @@ int paramSegmentSize(VMArgs *args);
 
 void descartarLinea();
 
+int guardarImagen(const char *path, int32_t *registers, int32_t *listSegments, int8_t *mainMemory, int memKiB);
+
+int breakpoint(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx);
+
+void escribeBigEndian(FILE *file, int32_t valor);
+
+int32_t leeBigEndian(FILE *file);
+
+int cargarVMI(const char *path, int32_t *registers, int32_t *listSegments, int8_t **mainMemory, int *memKiB);
+
+
+int cargarVMX(VMArgs *args, int32_t *registers, int32_t *listSegments, int8_t *mainMemory, int32_t memsize);
 
 
 int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
     VMArgs args;
+    VMContext ctx={0};
     if(!parseArgs(argc,argv,&args)){
         printf("ARGUMENTOS INVALIDOS\n");
         return 1;
@@ -205,122 +222,59 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
     srand(time(NULL)); //inicializa semilla al iniciar programa
     int32_t registers[32]={0}; //serian los 32 registros de 4 bytes que se piden
     int32_t listSegments[8]={0}; //serian los 8 segmentos de 4 bytes que se piden
-    int32_t memsize=args.memKiB*1024; //Traduzco el parametro m de KiB a bytes
-    int8_t *mainMemory = calloc(memsize, 1);//seria la memoria principal de tamaño variable
-    int segReg[6] = {PS, KS, CS, DS, ES, SS};
-    uint16_t segSize[6] = {0};
-    uint16_t entryPoint = 0;
-    if(mainMemory==NULL){
-        printf("ERROR AL INICIALIZAR MEMORIA\n");
-        return 1;
-    }
-    void (*op[32])(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag)={SYS, JMP, JP, JN, JZ, JC, JV, JNP,JNN, JNZ, NOT, PUSH, POP, CALL, RET, STOP, MOV, ADD, SUB, MUL, DIV, CMP, AND, OR, XOR, SWAP, SHL, SHR, SAR, LDL, LDH, RND};
-    
-    if(args.vmxPath == NULL){
-        printf("CARGA DESDE .VMI AUN NO IMPLEMENTADA");
-        free(mainMemory);
-        return 1;
-    }
+    int8_t *mainMemory = NULL;
+    void (*op[32])(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx)={SYS, JMP, JP, JN, JZ, JC, JV, JNP,JNN, JNZ, NOT, PUSH, POP, CALL, RET, STOP, MOV, ADD, SUB, MUL, DIV, CMP, AND, OR, XOR, SWAP, SHL, SHR, SAR, LDL, LDH, RND};
 
-    FILE * arch = fopen(args.vmxPath, "rb");
-    int version = verifyFile(arch);
-
-
-    if (version){
-        
-        int32_t Lultinst,Fultinst;
-        int8_t ultinst;
-        
-        //Se cargan las variables del archivo y se setean los arrays.
-        if(!readHeader(arch,version,segSize,&entryPoint,memsize)){
-            fclose(arch);
-            free(mainMemory);
+    ctx.vmiPath=args.vmiPath;
+    if (args.vmxPath != NULL){      // .vmx (con o sin .vmi): se ejecuta el programa
+        ctx.memKiB=args.memKiB;
+        mainMemory = calloc(ctx.memKiB*1024, 1);
+        if(mainMemory==NULL){
+            printf("ERROR AL INICIALIZAR MEMORIA\n");
             return 1;
-
         }
-        if(version==2){
-            int tamPS=paramSegmentSize(&args); 
-            if(tamPS > 0xFFFF){ //Verifico que no se pase de uint16_t (tamaño del arreglo segSize)
-                    printf("PARAMETROS DEMASIADO GRANDES\n");
-                    fclose(arch);
-                    free(mainMemory);
-                    return 1;
-            }
-            segSize[0] = tamPS; //Setea en el registro de tamaños el tamaño de PS  
-
-            
-        }
-        if(!buildSegments(listSegments,registers,segReg,segSize,memsize)){
-            fclose(arch);
+        if (!cargarVMX(&args, registers, listSegments, mainMemory, ctx.memKiB*1024)){
             free(mainMemory);
             return 1;
         }
-        int baseCS = getSegmentBase(registers[CS], listSegments);
-        loadBytes(arch, segSize[2], mainMemory + baseCS);
-
-        if (registers[KS] != -1) {
-            int baseKS = getSegmentBase(registers[KS],listSegments);
-            loadBytes(arch, segSize[1], mainMemory + baseKS);
+    }
+    else{                           // solo .vmi: se retoma la imagen
+        if (!cargarVMI(args.vmiPath, registers, listSegments, &mainMemory, &ctx.memKiB)){
+            free(mainMemory);     
+            return 1;
         }
-        //Inicializacion Param Segment
-        int32_t argcVal=0, argvVal=-1;
-        if(registers[PS]!=-1){
-            int offArgv = setParamSegment(listSegments, &args, mainMemory, registers);
-            argcVal = args.paramCount + 1;
-            argvVal = (registers[PS] & 0xFFFF0000) | offArgv;
+    }
+        
+    int abortado=0;
+    while (registers[IP] != -1){
+        readNextInst(mainMemory, registers, listSegments);
 
-        }
-        // Inicialización de la pila: SP al final del SS; se apilan argv, argc y RET
-         if (registers[SS] != -1) {
-            registers[SP] = registers[SS] + segSize[5];
-            if (!pushValue(mainMemory, registers, listSegments, argvVal) || 
-                !pushValue(mainMemory, registers, listSegments, argcVal)  || 
-                !pushValue(mainMemory, registers, listSegments, -1)) {   // RET
-                fclose(arch);
-                free(mainMemory);
-                return 1;
-            }
+        if (registers[IP] == -1){
+            break;
         }
         
-
-
-   
-
-        if (args.disassemble){
-            registers[IP] = registers[CS];
-            DISASSEMBLER(mainMemory, registers, listSegments);
+        if (registers[OPC]<=31 && registers[OPC]>=0){
+            op[registers[OPC]](mainMemory, registers, listSegments, &ctx);
         }
-        registers[IP]=registers[CS] | entryPoint;
-        
-        
-        while (registers[IP] != -1){
-            Lultinst=registers[IP];
-            readNextInst(mainMemory, registers, listSegments);
-
-            if (registers[IP] == -1){
+        else{
+            runtimeError(registers, "ERROR OPERACION INVALIDA");
+        }
+        if (ctx.pasoAPaso && registers[IP] != -1){   // SYS F o paso a paso
+            if (!breakpoint(mainMemory, registers, listSegments, &ctx)){
+                abortado = 1;
                 break;
             }
-            
-            if (registers[OPC]<=31 && registers[OPC]>=0){
-                op[registers[OPC]](mainMemory, registers, listSegments, args.disassemble);
-            }
-            else{
-                runtimeError(registers, "ERROR OPERACION INVALIDA");
-            }
         }
-        fclose(arch);
-        if (vmError){
-            free(mainMemory);
-            return 1;
-        }
-        printf("Fin de proceso.\n");
     }
-    else{
-        free(mainMemory);
+    free(mainMemory);
+    if (vmError)
         return 1;
-    }
-    free(mainMemory);//Libera la memoria principal al finalizar el ciclo
+    if(!abortado)
+        printf("Fin de proceso.\n");
+    else
+        printf("Proceso abortado por usuario\n");
     return 0;
+            
 }
 
 
@@ -727,15 +681,182 @@ int getSegmentSize(int32_t reg, int32_t *listSegments){ //Funcion que obtiene el
     return listSegments[(reg >> 16) & 0xFFFF] & 0xFFFF;
 }
 
+//Funciones .vmi -------------------------------------------------- !!
+//Guarda la imagen de la maquina virtual en el archivo .vmi
+//Header (8) + registros (32 x 4) + tabla de segmentos (8 x 4) + memoria completa
+int guardarImagen(const char *path, int32_t *registers, int32_t *listSegments, int8_t *mainMemory, int memKiB){
+    FILE *file = fopen(path, "wb");
+    if (file == NULL){
+        return 0;
+    }
+    uint8_t header[8] = {'V','M','I','2','6', 1, (memKiB >> 8) & 0xFF, memKiB & 0xFF};
+    fwrite(header, 1, 8, file);
+    for (int i = 0; i < 32; i++)
+        escribeBigEndian(file, registers[i]);
+    for (int i = 0; i < NUM_SEGMENTOS; i++)
+        escribeBigEndian(file, listSegments[i]);
+    fwrite(mainMemory, 1, memKiB * 1024, file);
+    fclose(file);
+    return 1;
+}
+//Lee un entero de 4 bytes en big endian del archivo
+int32_t leeBigEndian(FILE *file){
+    uint8_t b[4] = {0};
+    fread(b, 1, 4, file);
+    return (int32_t)(((uint32_t)b[0] << 24) | ((uint32_t)b[1] << 16) | ((uint32_t)b[2] << 8) | b[3]);
+}
+
+
+//Carga la memoria, los registros y la tabla de segmentos desde un archivo de imagen .vmi
+//Reserva la memoria con el tamaño indicado en la imagen. Devuelve 0 si hubo error
+int cargarVMI(const char *path, int32_t *registers, int32_t *listSegments, int8_t **mainMemory, int *memKiB){
+    uint8_t header[8];
+    FILE *file = fopen(path, "rb");
+    if (file == NULL){
+        printf("ARCHIVO DE IMAGEN INEXISTENTE: %s\n", path);
+        return 0;
+    }
+    if (fread(header, 1, 8, file) != 8 || memcmp(header, "VMI26", 5) != 0 || header[5] != 1){
+        printf("ARCHIVO DE IMAGEN INVALIDO\n");
+        fclose(file);
+        return 0;
+    }
+    *memKiB = (header[6] << 8) | header[7];
+    *mainMemory = calloc(*memKiB * 1024, 1);
+    if (*mainMemory == NULL){
+        printf("ERROR AL INICIALIZAR MEMORIA\n");
+        fclose(file);
+        return 0;
+    }
+    for (int i = 0; i < 32; i++)
+        registers[i] = leeBigEndian(file);
+    for (int i = 0; i < NUM_SEGMENTOS; i++)
+        listSegments[i] = leeBigEndian(file);
+    if (fread(*mainMemory, 1, *memKiB * 1024, file) != (size_t)(*memKiB * 1024)){
+        printf("ARCHIVO DE IMAGEN INCOMPLETO\n");
+        fclose(file);
+        return 0;
+    }
+    fclose(file);
+    return 1;
+}
+
+
+//Funcion auxiliar, escribe un entero de 4 bytes en el archivo en big endian
+void escribeBigEndian(FILE *file, int32_t valor){
+    uint8_t b[4];
+    b[0] = (valor >> 24) & 0xFF;
+    b[1] = (valor >> 16) & 0xFF;
+    b[2] = (valor >> 8) & 0xFF;
+    b[3] = valor & 0xFF;
+    fwrite(b, 1, 4, file);
+}
+
+//Carga un programa .vmx: segmentos, codigo, constantes, Param Segment, pila e IP
+//Deja la VM lista para ejecutar. Devuelve 0 si hubo error
+int cargarVMX(VMArgs *args, int32_t *registers, int32_t *listSegments, int8_t *mainMemory, int32_t memsize){
+    int segReg[6] = {PS, KS, CS, DS, ES, SS};
+    uint16_t segSize[6] = {0};
+    uint16_t entryPoint = 0;
+
+    FILE * arch = fopen(args->vmxPath, "rb");
+    int version = verifyFile(arch);
+    if(!version)
+        return 0;
+        
+    //Se cargan las variables del archivo y se setean los arrays.
+    if(!readHeader(arch,version,segSize,&entryPoint,memsize)){
+        fclose(arch);
+        return 0;
+
+    }
+    if(version==2){
+        int tamPS=paramSegmentSize(args); 
+        if(tamPS > 0xFFFF){ //Verifico que no se pase de uint16_t (tamaño del arreglo segSize)
+                printf("PARAMETROS DEMASIADO GRANDES\n");
+                fclose(arch);
+                return 0;
+        }
+        segSize[0] = tamPS; //Setea en el registro de tamaños el tamaño de PS  
+
+        
+    }
+    if(!buildSegments(listSegments,registers,segReg,segSize,memsize)){
+        fclose(arch);
+        return 0;
+    }
+    int baseCS = getSegmentBase(registers[CS], listSegments);
+    loadBytes(arch, segSize[2], mainMemory + baseCS);
+
+    if (registers[KS] != -1) {
+        int baseKS = getSegmentBase(registers[KS],listSegments);
+        loadBytes(arch, segSize[1], mainMemory + baseKS);
+    }
+    //Inicializacion Param Segment
+    int32_t argcVal=0, argvVal=-1;
+    if(registers[PS]!=-1){
+        int offArgv = setParamSegment(listSegments, args, mainMemory, registers);
+        argcVal = args->paramCount + 1;
+        argvVal = (registers[PS] & 0xFFFF0000) | offArgv;
+
+    }
+    // Inicialización de la pila: SP al final del SS; se apilan argv, argc y RET
+    if (registers[SS] != -1) {
+    registers[SP] = registers[SS] + segSize[5];
+    if (!pushValue(mainMemory, registers, listSegments, argvVal) || 
+        !pushValue(mainMemory, registers, listSegments, argcVal)  || 
+        !pushValue(mainMemory, registers, listSegments, -1)) {   // RET
+        fclose(arch);
+        return 0;
+    }
+}
 
 
 
+
+
+    if (args->disassemble){
+        registers[IP] = registers[CS];
+        DISASSEMBLER(mainMemory, registers, listSegments);
+    }
+    registers[IP]=registers[CS] | entryPoint;
+    fclose(arch);
+    return 1;
+
+
+
+
+}
+
+//Breakpoint: guarda la imagen y espera la accion del usuario
+//g: continua | Enter: ejecuta una instruccion y vuelve a frenar | q: aborta
+//Devuelve 0 si el usuario aborto la ejecucion
+int breakpoint(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
+    int c;
+    if (!guardarImagen(ctx->vmiPath, registers, listSegments, mainMemory, ctx->memKiB)){
+        runtimeError(registers, "ERROR AL GUARDAR LA IMAGEN");
+        return 1;
+    }
+    do {
+        printf("[BREAKPOINT] g: continuar | q: salir | Enter: paso a paso\n");
+        c = getchar();
+        if (c != '\n')
+            descartarLinea();           // consume el resto de la linea (ej: "g\n")
+    } while (c != 'g' && c != 'q' && c != '\n');
+
+    if (c == 'q')
+        return 0;
+    ctx->pasoAPaso = (c == '\n');       // Enter: sigue paso a paso; g: corre libre
+        return 1;
+}
+
+//-------------------------------------- Fin funciones VMI !!
 
 //funcion que carga el codigo en la memoria principal.
 void loadBytes(FILE *file, uint16_t cSize, int8_t *mainMemory) {
     int i;
     for (i=0; i<cSize; i++){
-        if(fread(&(mainMemory[i]), sizeof(int8_t), 1, file)!=1);
+        fread(&(mainMemory[i]), sizeof(int8_t), 1, file);
     }
 }
 
@@ -779,7 +900,7 @@ int32_t getOp(int tipo, int8_t *mainMemory,int rindex){
 
 
 //Funcion que obtiene el valor de un operando y lo devuelve
-int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+int32_t getValorOpnd(int32_t operando, int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     int8_t tipo = (operando >> 24) & 0x000000FF;
     int16_t codReg;
     int32_t valor=0;
@@ -1004,7 +1125,7 @@ void loadInMemory(int32_t *registers, int8_t *mainMemory, int32_t listSegments[]
         
         // Escribir en memoria
         uint32_t aux = (uint32_t)registers[MBR];
-        for (size_t i = 0; i < opSize; i++) {
+        for (int i = 0; i < opSize; i++) {
             size_t shift = 8 * (opSize - 1 - i);
             mainMemory[fDir + i] = (int8_t)((aux >> shift) & 0xFF);
         }
@@ -1057,13 +1178,15 @@ void readFromMemory(int32_t *registers, int8_t *mainMemory, int32_t listSegments
 
 
 //Funcion SYS
-void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int op = getValorOpnd(registers[OP2],mainMemory,registers,listSegments,flag);
+void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int op = getValorOpnd(registers[OP2],mainMemory,registers,listSegments,ctx);
     int i;
     char auxS[33];
     int32_t aux=registers[ECX]&L2Bt, tam=(registers[ECX]>>16)&L2Bt;
-    registers[LAR] = registers[EDX];
-    registers[MAR] = (registers[ECX]&H2Bt);
+    if(op!=15 && op!=0){ //La consigna dice explicitamente que estos llamados SYS no modifican registros
+        registers[LAR] = registers[EDX];
+        registers[MAR] = (registers[ECX]&H2Bt);
+    }
 
     switch (op){
         case 1:{
@@ -1181,6 +1304,11 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             }
             break;
         }
+        case 15:{
+            if(ctx->vmiPath!=NULL)
+                ctx->pasoAPaso=1;
+            return; //Vuelvo para no modificar registros
+        }
 
         case 0:{
             fflush(stdout);
@@ -1189,11 +1317,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
             #else
                 system("clear");
             #endif
-        break;
-        }
-
-        case 15:{
-        break;
+            return; //Vuelvo para no modificar registros
         }
         default:{
             runtimeError(registers, "SYS: Operacion invalida");
@@ -1201,6 +1325,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
         }
        
     }
+
     registers[LAR] = registers[EDX];
 }
 
@@ -1286,8 +1411,8 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
 
 
 //Funcion JMP
-void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
+void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);
 
     if (((listSegments[(registers[CS] >> 16) & L2Bt] & L2Bt) > valor) &&  (valor>=0)){
         registers[IP] =(registers[IP] & H2Bt)+valor;
@@ -1299,9 +1424,9 @@ void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 
 
 //Funcion LOAD DATA LOW
-void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag) {
-    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx) {
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, ctx);
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
     valor = valor & 0xFFFF;
     a =(a& 0xFFFF0000) | valor;
     writeInOp(registers[OP1],a, mainMemory, registers, listSegments);
@@ -1309,18 +1434,17 @@ void LDL (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int fla
 
 
 //Funcion LOAD DATA HIGH
-void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag) {
-    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, flag);
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void LDH (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx) {
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers, listSegments, ctx);
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
     a = (a & 0x0000FFFF) | ((valor & 0xFFFF) << 16);
     writeInOp(registers[OP1],a, mainMemory, registers, listSegments);
 }
 
 
 //Funcion MOV
-void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t a=getValorOpnd(registers[OP1],mainMemory,registers,listSegments,flag);
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
 
     writeInOp(registers[OP1],valor, mainMemory, registers, listSegments);
     setCC(OP_MOV,0,0,valor,registers);
@@ -1328,58 +1452,58 @@ void MOV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //FUNCIONES JUMP CONDICIONALES --------------------- !!
-void JN(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void JN(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     if (((registers[CC] & 0x80000000)>>31) & L2Bt){
-        JMP(mainMemory,registers,listSegments, flag);
+        JMP(mainMemory,registers,listSegments, ctx);
 }
 }
 
 
-void JP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void JP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     if ((((registers[CC] & 0xC0000000)>>30) & L2Bt) == 0){
-        JMP(mainMemory,registers,listSegments, flag);
+        JMP(mainMemory,registers,listSegments, ctx);
     }
 }
 
 
-void JZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void JZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     if (((registers[CC] & 0x40000000)>>30) & L2Bt){
-        JMP(mainMemory,registers,listSegments, flag);
+        JMP(mainMemory,registers,listSegments, ctx);
     }
 }
 
 
-void JC(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void JC(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     if (((registers[CC] & 0x20000000)>>29) & L2Bt){
-        JMP(mainMemory,registers,listSegments, flag);
+        JMP(mainMemory,registers,listSegments, ctx);
     }
 }
 
 
-void JV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void JV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     if (((registers[CC] & 0x10000000)>>28) & L2Bt){
-        JMP(mainMemory,registers,listSegments, flag);
+        JMP(mainMemory,registers,listSegments, ctx);
     }
 }
 
 
-void JNP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void JNP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     if ((((registers[CC] & 0x80000000)>>31) & L2Bt) || (((registers[CC] & 0x40000000)>>30) & L2Bt)){
-        JMP(mainMemory,registers,listSegments, flag);
+        JMP(mainMemory,registers,listSegments, ctx);
     }
 }
 
 
-void JNN(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void JNN(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     if ((((registers[CC] & 0x80000000)>>31) & L2Bt) == 0){
-        JMP(mainMemory,registers,listSegments, flag);
+        JMP(mainMemory,registers,listSegments, ctx);
     }
 }
 
 
-void JNZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void JNZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     if ((((registers[CC] & 0x40000000)>>30) & L2Bt) == 0){
-        JMP(mainMemory,registers,listSegments, flag);
+        JMP(mainMemory,registers,listSegments, ctx);
     }
 }
 
@@ -1387,28 +1511,28 @@ void JNZ(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion NOT
-void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
+void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);
     int32_t resultado = ~valor;
     writeInOp(registers[OP2],resultado, mainMemory, registers, listSegments);
     setCC(OP_NOT,valor,0,resultado,registers);
 }
 
 //Funciones de pila -------------------------------- !!
-void PUSH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag){
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
+void PUSH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);
     pushValue(mainMemory, registers, listSegments, valor);
 }
 
-void POP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag){
+void POP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
     int32_t valor;
     if (popValue(mainMemory, registers, listSegments, &valor))
         writeInOp(registers[OP2], valor, mainMemory, registers, listSegments);
 }
 
 //Funcion CALL
-void CALL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag){
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, flag);
+void CALL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);
 
     if (valor < 0 || valor >= getSegmentSize(registers[CS], listSegments)){
         runtimeError(registers, "Salto fuera del segmento de codigo");
@@ -1419,7 +1543,7 @@ void CALL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int fl
 }
 
 //Funcion RET
-void RET(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag){
+void RET(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
     int32_t valor;
     if (popValue(mainMemory, registers, listSegments, &valor))
         registers[IP] = valor;
@@ -1429,9 +1553,9 @@ void RET(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int fla
 
 
 //Funcion ADD
-void ADD(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void ADD(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
 
     valor = a + b; //*a = *a +b
 
@@ -1442,9 +1566,9 @@ void ADD(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion SUB
-void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
 
     valor = a + (~(uint32_t)b+1);
 
@@ -1455,9 +1579,9 @@ void SUB(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion MUL
-void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
 
     valor = a * b;
 
@@ -1468,9 +1592,9 @@ void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion DIV
-void DIV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor=0, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-        int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void DIV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor=0, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+        int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
         if(b==0){
             runtimeError(registers, "ERROR: DIVISION POR 0 NO EVALUADA");
         }
@@ -1488,9 +1612,9 @@ void DIV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion XOR
-void XOR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void XOR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
 
     valor = a ^ b;
 
@@ -1501,9 +1625,9 @@ void XOR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion SWAP
-void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int flag){
-    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
     writeInOp(registers[OP1],b, mainMemory, registers, listSegments);
     writeInOp(registers[OP2],a,mainMemory,registers,listSegments);
     setCC(OP_XOR, a ^ b, a, b, registers);
@@ -1514,10 +1638,10 @@ void SWAP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int fl
 
 
 //Funcion SHL
-void SHL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void SHL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     uint32_t valor;
-    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
     valor = ((uint32_t)a) << b;
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SHL,a,b,valor,registers);
@@ -1526,10 +1650,10 @@ void SHL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion SHR
-void SHR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void SHR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     uint32_t valor; //al ser unsigned, el shift agrega 0 por izquierda
-    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+    int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
     valor=(uint32_t)a>>b;
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SHR,a,b,valor,registers);
@@ -1538,9 +1662,9 @@ void SHR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion SAR
-void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
     valor=a>>b; //como aca valor es signed, propaga el signo normalmente
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SAR,a,b,valor,registers);
@@ -1551,9 +1675,9 @@ void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion RND
-void RND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void RND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     int32_t valor;
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
 
     valor=rand() % (b+1);
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
@@ -1562,18 +1686,18 @@ void RND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion CMP
-void CMP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void CMP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
     valor=a-b;
     setCC(OP_CMP,a,b,valor,registers);
 }
 
 
 //Funcion AND
-void AND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void AND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
     valor = a & b;
 
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
@@ -1584,9 +1708,9 @@ void AND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag
 
 
 //Funcion OR
-void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
-    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, flag);
-    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, flag);
+void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
+    int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
 
     valor = a | b;
 
@@ -1598,12 +1722,12 @@ void OR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag)
 
 
 //Funcion STOP
-void STOP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void STOP(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     registers[IP] = -1;
 }
 
 
 //Funcion invalida, tira error.
-void INVALID(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], int flag){
+void INVALID(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     runtimeError(registers, "ERROR CODIGO DE OPERACION INVALIDA");
 }
