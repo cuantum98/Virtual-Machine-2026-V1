@@ -1268,7 +1268,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMConte
                 case 16:
                     for (i=0;i<aux;i++){
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
-                        scanf(" %s",auxS);
+                        scanf(" %32s",auxS);
                         descartarLinea();
                         registers[MBR]=(int32_t)stringToInt(auxS);
                         loadInMemory(registers,mainMemory,listSegments);
@@ -1744,7 +1744,8 @@ void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContex
 void RND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     int32_t valor;
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
-
+    if (b < 0) 
+        b = 0;     //evita rand() % 0
     valor=rand() % (b+1);
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
