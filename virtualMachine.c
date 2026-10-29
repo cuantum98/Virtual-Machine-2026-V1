@@ -1650,19 +1650,22 @@ void MUL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContex
 //Funcion DIV
 void DIV(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     int32_t valor=0, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
-        int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
-        if(b==0){
-            runtimeError(registers, "ERROR: DIVISION POR 0 NO EVALUADA");
-        }
+    int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
+    if(b==0){
+        runtimeError(registers, "ERROR: DIVISION POR 0 NO EVALUADA");
+    }
     else{
-        
+        if (a == INT32_MIN && b == -1){     // el resultado no entra en 32 bits: queda igual que en complemento a 2
+            valor = INT32_MIN;
+            registers[AC] = 0;
+        }
+        else{
             valor = a / b;
-
             registers[AC]=a%b; //guardo resto de division entera en AC
+        }
         writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
-        
-
         setCC(OP_DIV,a,b,valor,registers);
+    
     }
 }
 
