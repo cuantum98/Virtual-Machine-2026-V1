@@ -188,6 +188,10 @@ int pushValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], in
 
 int popValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t *valor);
 
+int reservarPila(int32_t *registers);
+
+void escribirTope(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t valor);
+
 int getSegmentBase(int32_t reg, int32_t *listSegments);
 
 int getSegmentSize(int32_t reg, int32_t *listSegments);
@@ -649,13 +653,11 @@ int popValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int
     registers[MAR] = 4 << 16;      // readFromMemory saca el tamaño de la parte alta de MAR
     readFromMemory(registers, mainMemory, listSegments);
     *valor = registers[MBR];
-    registers[SP]+=4; //Se popeo con exito, se mueve el tope
-    return 1;
+    return 1; //el SP lo incrementa quien llama, despues de asignar
 }
 
-
-//Pushea un valor a la pila, devuelve 1 si salio bien y 0 si hubo overflow, guarda en valor el elemento pusheado
-int pushValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t valor){
+//Reserva 4 bytes en la pila (pasos 1 y 2 de PUSH). Devuelve 0 si hubo overflow
+int reservarPila(int32_t *registers){
     if(registers[SS] == -1){
         runtimeError(registers, "STACK OVERFLOW");
         return 0;
@@ -665,10 +667,23 @@ int pushValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], in
         runtimeError(registers, "STACK OVERFLOW");
         return 0;
     }
+    return 1;
+}
+
+//Escribe un valor de 4 bytes en el tope de la pila
+void escribirTope(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t valor){
     registers[LAR] = registers[SP];
     registers[MAR] = 4 << 16;      //loadInMemory saca el tamaño de la parte alta de MAR
     registers[MBR]=valor; //Cargo valor en el MBR
     loadInMemory(registers, mainMemory, listSegments);
+}
+
+
+//Pushea un valor a la pila, devuelve 1 si salio bien y 0 si hubo overflow, guarda en valor el elemento pusheado
+int pushValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t valor){
+    if (!reservarPila(registers))
+        return 0;
+    escribirTope(mainMemory, registers, listSegments, valor);
     return 1;
 }
 
@@ -1520,14 +1535,18 @@ void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContex
 
 //Funciones de pila -------------------------------- !!
 void PUSH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);
-    pushValue(mainMemory, registers, listSegments, valor);
+    if (!reservarPila(registers))           // pasos 1 y 2: SP -= 4 y overflow
+        return;
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);  // paso 3, con el SP nuevo
+    escribirTope(mainMemory, registers, listSegments, valor);
 }
 
 void POP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
     int32_t valor;
-    if (popValue(mainMemory, registers, listSegments, &valor))
-        writeInOp(registers[OP2], valor, mainMemory, registers, listSegments);
+    if (popValue(mainMemory, registers, listSegments, &valor)){
+        writeInOp(registers[OP2], valor, mainMemory, registers, listSegments);   // paso 4
+        registers[SP]+=4;                                                         // paso 5
+    }
 }
 
 //Funcion CALL
@@ -1545,8 +1564,10 @@ void CALL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMCont
 //Funcion RET
 void RET(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
     int32_t valor;
-    if (popValue(mainMemory, registers, listSegments, &valor))
+    if (popValue(mainMemory, registers, listSegments, &valor)){
         registers[IP] = valor;
+        registers[SP]+=4;
+    }
 }
 
 
