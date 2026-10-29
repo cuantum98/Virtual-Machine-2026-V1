@@ -555,7 +555,7 @@ int readHeader(FILE *file, int version, uint16_t *segSize, uint16_t *entrypoint,
 //Descarta lo que quede en la linea de entrada, incluido el '\n'
 void descartarLinea(){
     int c=getchar();
-    while(c!='\n')
+    while(c!='\n' && c!=EOF)
         c=getchar();
 }
 
@@ -858,6 +858,8 @@ int breakpoint(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], V
     do {
         printf("[BREAKPOINT] g: continuar | q: salir | Enter: paso a paso\n");
         c = getchar();
+        if(c == EOF)
+            return 0;
         if (c != '\n')
             descartarLinea();           // consume el resto de la linea (ej: "g\n")
     } while (c != 'g' && c != 'q' && c != '\n');
