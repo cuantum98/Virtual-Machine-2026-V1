@@ -216,6 +216,8 @@ int cargarVMI(const char *path, int32_t *registers, int32_t *listSegments, int8_
 
 int cargarVMX(VMArgs *args, int32_t *registers, int32_t *listSegments, int8_t *mainMemory, int32_t memsize);
 
+int tamOperando(int32_t operando);
+
 
 int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
     VMArgs args;
@@ -1027,6 +1029,23 @@ void writeInOp(int32_t operando, int32_t valor, int8_t *mainMemory, int32_t *reg
 
 }
 
+//Devuelve el tamaño en bytes del operando: sector de registro o modificador de memoria
+int tamOperando(int32_t operando){
+    int tipo = (operando >> 24) & 0xFF;
+    if (tipo == 1){                             // registro: 00 = 4, 01 = byte bajo, 10 = 3er byte, 11 = 2 bytes
+        int sector = (operando >> 5) & 0b11;
+        if (sector == 0) return 4;
+        if (sector == 3) return 2;
+        return 1;
+    }
+    if (tipo == 3){                             // memoria: 001 = b, 010 = w, 100 o sin prefijo = l
+        int mod = (operando >> 5) & 0b111;
+        if (mod == 1) return 1;
+        if (mod == 2) return 2;
+    }
+    return 4;
+}
+
 
 //Funcion para leer la siguiente instruccion
 void readNextInst(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]){
@@ -1407,11 +1426,17 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
         }
 
         case OP_SHL: {
-            uint64_t shiftC = (uint64_t)(uint32_t)a << (uint64_t)(uint32_t)b;
-            int64_t shiftV= (int64_t)a << (int64_t)b;
+            if ((uint32_t)b >= 32){             // salen todos los bits
+                C = (a != 0);
+                V = (a != 0);
+            }
+            else{
+                uint64_t shiftC = (uint64_t)(uint32_t)a << (uint64_t)(uint32_t)b;
+                int64_t shiftV= (int64_t)a << (int64_t)b;
 
-            C = (((shiftC >> 32) & L4Bt)!=0);
-            V = ((shiftV) != ((int32_t)(shiftV)));
+                C = (((shiftC >> 32) & L4Bt)!=0);
+                V = ((shiftV) != ((int32_t)(shiftV)));
+            }
             break;
         }
 
@@ -1673,7 +1698,7 @@ void SHL(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContex
     uint32_t valor;
     int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
-    valor = ((uint32_t)a) << b;
+    valor = ((uint32_t)b >= 32) ? 0 : ((uint32_t)a) << b;   // 32 o mas: salen todos los bit
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SHL,a,b,valor,registers);
 
@@ -1685,7 +1710,11 @@ void SHR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContex
     uint32_t valor; //al ser unsigned, el shift agrega 0 por izquierda
     int32_t a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
-    valor=(uint32_t)a>>b;
+    int tam = tamOperando(registers[OP1]);
+    uint32_t sinSigno = (uint32_t)a;
+    if (tam < 4)                                 // AL, AH, AX, b[], w[]: sin el signo extendido, asi entran ceros
+        sinSigno &= (1u << (tam * 8)) - 1;
+    valor = ((uint32_t)b >= 32) ? 0 : sinSigno >> b;
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SHR,a,b,valor,registers);
 
@@ -1696,7 +1725,10 @@ void SHR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContex
 void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     int32_t valor, a = getValorOpnd(registers[OP1], mainMemory, registers,listSegments, ctx);
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
-    valor=a>>b; //como aca valor es signed, propaga el signo normalmente
+    if ((uint32_t)b >= 32)
+        valor = (a < 0) ? -1 : 0;               // 32 o mas: queda todo el signo
+    else
+        valor = a >> b; //como aca valor es signed, propaga el signo normalmente
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
     setCC(OP_SAR,a,b,valor,registers);
 
