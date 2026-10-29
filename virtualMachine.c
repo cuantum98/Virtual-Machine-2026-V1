@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include <stddef.h>
+#include <ctype.h>
 
 
 // Son todas las operaciones con las que trabajamos, es necesario para calcular el CC.
@@ -1261,30 +1262,39 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMConte
         }
 
         case 2:{
+            int bytesCelda = (tam > 4) ? 4 : tam;
             for (i=0;i<aux;i++){
-                    readFromMemory(registers,mainMemory,listSegments); // lee UNA vez, deja el valor en MBR
-                    printf("\n[%04x]: ",getDir(registers[LAR],listSegments));
-                    if (registers[EAX] & 0x01){ // bit 0: decimal
-                        printf(" %d",registers[MBR]);
-                    }
-                    if (registers[EAX] & 0x02){ // bit 1: caracteres
-                        printf(" %c",registers[MBR]);
-                    }
-                    if (registers[EAX] & 0x04){ // bit 2: octal
-                        printf(" 0o%o",registers[MBR]);
-                    }
-                    if (registers[EAX] & 0x08){ // bit 3: hexadecimal
-                        printf(" 0x%x",registers[MBR]);
-                    }
-                    if (registers[EAX] & 0x10){ // bit 4: binario
-                        intToString(auxS,registers[MBR]);
-                        printf(" 0b%s",auxS);
-                    }
-                    printf("\n");
-                
-                    registers[LAR]+=tam; // avanza UNA sola vez por celda, no por formato
+                readFromMemory(registers,mainMemory,listSegments); // lee UNA vez, deja el valor en MBR
+                if (registers[IP] == -1)        // error de segmento: no se imprime basura
+                    break;
+                uint32_t sinSigno = (uint32_t)registers[MBR];
+                if (bytesCelda < 4)             // binario, octal y hexa solo con los bytes de la celda
+                    sinSigno &= (1u << (bytesCelda * 8)) - 1;
+
+                printf("[%04x]:", getDir(registers[LAR],listSegments));
+                if (registers[EAX] & 0x10){     // bit 4: binario
+                    intToString(auxS, (int)sinSigno);
+                    printf(" 0b%s", auxS);
                 }
+                if (registers[EAX] & 0x08)      // bit 3: hexadecimal
+                    printf(" 0x%x", sinSigno);
+                if (registers[EAX] & 0x04)      // bit 2: octal
+                    printf(" 0o%o", sinSigno);
+                if (registers[EAX] & 0x02){     // bit 1: un caracter por cada byte de la celda
+                    printf(" ");
+                    for (int b = bytesCelda - 1; b >= 0; b--){
+                        unsigned char c = (registers[MBR] >> (8 * b)) & 0xFF;
+                        putchar(isprint(c) ? c : '.');
+                    }
+                }
+                if (registers[EAX] & 0x01)      // bit 0: decimal
+                    printf(" %d", registers[MBR]);
+                printf("\n");
+
+                registers[LAR]+=tam; // avanza UNA sola vez por celda, no por formato
+            }
             break;
+
             }
         
         case 3:{
