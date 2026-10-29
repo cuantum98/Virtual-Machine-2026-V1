@@ -1324,14 +1324,14 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMConte
                 registers[MAR] = (1 << 16);     // de a 1 byte
                 printf("[%04x]:",getDir(registers[LAR],listSegments));
                 c = getchar();
-                while (c != '\n' && (max == -1 || cant < max) && registers[IP] != -1){
+                while (c != '\n' && c!=EOF && (max == -1 || cant < max) && registers[IP] != -1){
                     registers[MBR] = c;
                     loadInMemory(registers,mainMemory,listSegments);
                     registers[LAR] += 1;
                     cant++;
                     c = getchar();
                 }
-                while (c != '\n')   // si se corto por ECX, descarta el resto de la linea
+                while (c != '\n' && c!=EOF)   // si se corto por ECX, descarta el resto de la linea
                     c = getchar();
                 if (registers[IP] != -1){       // '\0' final
                     registers[MBR] = 0;
