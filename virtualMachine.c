@@ -175,9 +175,7 @@ void RET (int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMCont
 
 void INVALID(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx);
 
-void DISASSEMBLER(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]);
-
-void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]);
+void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], uint16_t entryPoint);
 
 int parseArgs(int argc, char *argv[], VMArgs *args);
 
@@ -269,7 +267,7 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
         else{
             runtimeError(registers, "ERROR OPERACION INVALIDA");
         }
-        if (ctx.pasoAPaso && registers[IP] != -1){   // SYS F o paso a paso
+        if (ctx.pasoAPaso && !vmError){   // SYS F o paso a paso
             if (!breakpoint(mainMemory, registers, listSegments, &ctx)){
                 abortado = 1;
                 break;
@@ -352,143 +350,13 @@ int parseArgs(int argc, char *argv[], VMArgs *args){
 }
 
 
-//----------------------------DISASSEMBLER-------------------------------
-void DISASSEMBLER(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]) {
-    int32_t Lultinst, ultinst, Fultinst;
 
-    char *opndNames[32] = {
-        "SYS","JMP","JP","JN","JZ","JC","JV","JNP",
-        "JNN","JNZ","NOT","PUSH","POP","CALL","RET","STOP",
-        "MOV","ADD","SUB","MUL","DIV","CMP","AND","OR",
-        "XOR","SWAP","SHL","SHR","SAR","LDL","LDH","RND"
-    };
-
-    char *registersNames[32] = {
-        "IP","OPC","OP1","OP2","LAR","MAR","MBR","SP","BP"," ",
-        "EAX","EBX","ECX","EDX","EEX","EFX","AC","CC"," "," ",
-        " "," "," "," "," "," ","CS","DS","ES","SS","KS","PS"
-    };
-
-    int tamCS = getSegmentSize(registers[CS],listSegments);
-
-    while ((registers[IP] & 0xFFFF) < tamCS) {
-        Lultinst = registers[IP];
-        readNextInst(mainMemory, registers, listSegments);
-
-        if (registers[OPC] >= 0 && registers[OPC] <= 31) {
-            Fultinst = getDir(Lultinst, listSegments);
-            ultinst = mainMemory[Fultinst];
-
-            int32_t tipoa = (ultinst >> 4) & 0b11;
-            int32_t tipob = (ultinst >> 6) & 0b11;
-
-            char bytesStr[64] = "";
-            char opA[64] = "";
-            char opB[64] = "";
-
-            int8_t tipoA = (registers[OP1] >> 24) & 0xFF;
-            int8_t tipoB = (registers[OP2] >> 24) & 0xFF;
-
-            int16_t codReg;
-            int32_t valor;
-            int16_t offset;
-
-            // ---- Armar bytes ----
-            for (int i = 0; i < 1 + tipoa + tipob; i++) {
-                char temp[8];
-                sprintf(temp, "%02X ", (uint8_t)mainMemory[Fultinst + i]);
-                strcat(bytesStr, temp);
-            }
-
-            // ---- Operando A ----
-            switch (tipoA) {
-                case 1:
-                    codReg = registers[OP1] & 0b11111;
-                    sprintf(opA, "%s", registersNames[codReg]);
-                    break;
-
-                case 2:
-                    valor = (int16_t)(registers[OP1] & 0xFFFF);
-                    sprintf(opA, "%d", valor);
-                    break;
-
-                case 3:
-                    offset = (int16_t)((registers[OP1] >> 8) & 0xFFFF);
-                    codReg = registers[OP1] & 0b11111;
-                    if (offset == 0) {
-                        sprintf(opA, "[%s]", registersNames[codReg]);
-                    } else if (offset > 0) {
-                        sprintf(opA, "[%s+%d]", registersNames[codReg], offset);
-                    } else {
-                        sprintf(opA, "[%s%d]", registersNames[codReg], offset);
-                    }
-                    break;
-
-                default:
-                    strcpy(opA, "");
-                    break;
-            }
-
-            // ---- Operando B ----
-            switch (tipoB) {
-                case 1:
-                    codReg = registers[OP2] & 0b11111;
-                    sprintf(opB, "%s", registersNames[codReg]);
-                    break;
-
-                case 2:
-                    valor = (int16_t)(registers[OP2] & 0xFFFF);
-                    sprintf(opB, "%d", valor);
-                    break;
-
-                case 3:
-                    offset = (int16_t)((registers[OP2] >> 8) & 0xFFFF);
-                    codReg = registers[OP2] & 0b11111;
-                    if (offset == 0) {
-                        sprintf(opB, "[%s]", registersNames[codReg]);
-                    } else if (offset > 0) {
-                        sprintf(opB, "[%s+%d]", registersNames[codReg], offset);
-                    } else {
-                        sprintf(opB, "[%s%d]", registersNames[codReg], offset);
-                    }
-                    break;
-
-                default:
-                    strcpy(opB, "");
-                    break;
-            }
-
-            // ---- Impresión final ----
-            if (tipoA == 0 && tipoB == 0) {
-                printf("[%04X]  %-18s   | %-4s\n",
-                    (uint16_t)Fultinst,
-                    bytesStr,
-                    opndNames[registers[OPC]]);
-            }else if (tipoA == 0 && tipoB != 0) {
-                printf("[%04X]  %-18s   | %-4s %s\n",
-                    (uint16_t)Fultinst,
-                    bytesStr,
-                    opndNames[registers[OPC]],
-                    opB);
-            } else {
-                printf("[%04X]  %-18s   | %-4s %s, %s\n",
-                    (uint16_t)Fultinst,
-                    bytesStr,
-                    opndNames[registers[OPC]],
-                    opA,
-                    opB);
-            }
-        }
-    }
-}
-//-----------------------------------------------------------------------
 
 
 
 //----------------------------DISASSEMBLER V2-------------------------------
-void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]) {
+void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], uint16_t entryPoint) {
     int32_t Lultinst, ultinst, Fultinst;
-    uint16_t entryPoint = registers[IP] & 0xFFFF;
 
     char *opndNames[32] = {
         "SYS","JMP","JP","JN","JZ","JC","JV","JNP",
@@ -520,7 +388,7 @@ void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments
         int tamKS = getSegmentSize(registers[KS], listSegments);
         
         if (tamKS > 0) {
-            printf("CONST SEGMENT\n");
+
             int offset = 0;
 
             while (offset < tamKS) {
@@ -535,46 +403,35 @@ void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments
                 if (stringSize > 0 || (offset + stringSize < tamKS && mainMemory[baseKS + offset + stringSize] == '\0')) {
                     stringSize++;
                     
-                    printf("[%04X] ", (uint16_t)Fultinst);
-
-                    int bytesShown = 0;
-                    char stringContent[256] = "";
-                    int stringLen = 0;
-
-                    for (int i = 0; i < stringSize; i++) {
-                        uint8_t byte = (uint8_t)mainMemory[stringStart + i];
-                        
-                        if (bytesShown < 7) {
-                            printf("%02X ", byte);
-                            bytesShown++;
-                        }
-
-                        if (byte == '\0') {
-                            stringContent[stringLen] = '\0';
-                            break;
-                        } else if (byte >= 32 && byte <= 126) {
-                            stringContent[stringLen++] = (char)byte;
-                        } else {
-                            stringContent[stringLen++] = '.';
-                        }
+                    // bytes: todos si son hasta 7, si no los primeros 6 y ".."
+                    char bytesStr[32] = "";
+                    int mostrar = (stringSize > 7) ? 6 : stringSize;
+                    for (int i = 0; i < mostrar; i++) {
+                        char temp[8];
+                        sprintf(temp, "%02X ", (uint8_t)mainMemory[stringStart + i]);
+                        strcat(bytesStr, temp);
                     }
+                    if (stringSize > 7)
+                        strcat(bytesStr, ".. ");
 
-                    if (stringSize > 7) {
-                        printf("..");
+                    // string completo, con '.' en los caracteres no imprimibles
+                    printf(" [%04X] %-21s| \"", (uint16_t)Fultinst, bytesStr);
+                    for (int i = 0; i < stringSize - 1; i++) {      // stringSize - 1: sin el '\0'
+                        unsigned char c = (unsigned char)mainMemory[stringStart + i];
+                        putchar(isprint(c) ? c : '.');
                     }
-
-                    printf("| \"%s\"\n", stringContent);
+                    printf("\"\n");
                     
                     offset += stringSize;
                 } else {
                     break;
                 }
             }
-            printf("\n");
+
         }
     }
 
-    printf("CODE SEGMENT\n");
+
     int tamCS = getSegmentSize(registers[CS], listSegments);
 
     while ((registers[IP] & 0xFFFF) < tamCS) {
@@ -611,10 +468,8 @@ void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments
                     codReg = registers[OP1] & 0b11111;
                     
                     int idx = codReg;
-                    if (sector != 0) {
-                        idx = codReg + 21 + sector;
-                        if (idx >= 68) idx = codReg;
-                    }
+                    if (sector != 0 && codReg >= EAX && codReg <= EFX)
+                        idx = 32 + (codReg - EAX) * 3 + (sector - 1);   // AL AH AX, BL BH BX, ..., FL FH FX
                     
                     sprintf(opA, "%s", registersNames[idx]);
                     break;
@@ -624,31 +479,8 @@ void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments
                     int modifier = (registers[OP1] >> 5) & 0b111;
                     codReg = registers[OP1] & 0b11111;
                     offset = (int16_t)((registers[OP1] >> 8) & 0xFFFF);
-                    
-                    char modStr[4] = "";
-                    if (modifier == 1) strcpy(modStr, "b");
-                    else if (modifier == 2) strcpy(modStr, "w");
-                    else if (modifier == 4) strcpy(modStr, "l");
-
-                    if (offset == 0) {
-                        if (modStr[0] != '\0') {
-                            sprintf(opA, "%s[%s]", modStr, registersNames[codReg]);
-                        } else {
-                            sprintf(opA, "[%s]", registersNames[codReg]);
-                        }
-                    } else if (offset > 0) {
-                        if (modStr[0] != '\0') {
-                            sprintf(opA, "%s[%s+%d]", modStr, registersNames[codReg], offset);
-                        } else {
-                            sprintf(opA, "[%s+%d]", registersNames[codReg], offset);
-                        }
-                    } else {
-                        if (modStr[0] != '\0') {
-                            sprintf(opA, "%s[%s%d]", modStr, registersNames[codReg], offset);
-                        } else {
-                            sprintf(opA, "[%s%d]", registersNames[codReg], offset);
-                        }
-                    }
+                    char *modStr = (modifier == 1) ? "b" : (modifier == 2) ? "w" : "l";   // sin prefijo = 4 bytes = l
+                    sprintf(opA, "%s[%s%+d]", modStr, registersNames[codReg], offset);     // %+d: siempre con signo (+0, +4, -4)
                     break;
                 }
 
@@ -663,10 +495,8 @@ void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments
                     codReg = registers[OP2] & 0b11111;
                     
                     int idx = codReg;
-                    if (sector != 0) {
-                        idx = codReg + 21 + sector;
-                        if (idx >= 68) idx = codReg;
-                    }
+                    if (sector != 0 && codReg >= EAX && codReg <= EFX)
+                        idx = 32 + (codReg - EAX) * 3 + (sector - 1);   // AL AH AX, BL BH BX, ..., FL FH FX
                     
                     sprintf(opB, "%s", registersNames[idx]);
                     break;
@@ -682,31 +512,8 @@ void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments
                     int modifier = (registers[OP2] >> 5) & 0b111;
                     codReg = registers[OP2] & 0b11111;
                     offset = (int16_t)((registers[OP2] >> 8) & 0xFFFF);
-                    
-                    char modStr[4] = "";
-                    if (modifier == 1) strcpy(modStr, "b");
-                    else if (modifier == 2) strcpy(modStr, "w");
-                    else if (modifier == 4) strcpy(modStr, "l");
-
-                    if (offset == 0) {
-                        if (modStr[0] != '\0') {
-                            sprintf(opB, "%s[%s]", modStr, registersNames[codReg]);
-                        } else {
-                            sprintf(opB, "[%s]", registersNames[codReg]);
-                        }
-                    } else if (offset > 0) {
-                        if (modStr[0] != '\0') {
-                            sprintf(opB, "%s[%s+%d]", modStr, registersNames[codReg], offset);
-                        } else {
-                            sprintf(opB, "[%s+%d]", registersNames[codReg], offset);
-                        }
-                    } else {
-                        if (modStr[0] != '\0') {
-                            sprintf(opB, "%s[%s%d]", modStr, registersNames[codReg], offset);
-                        } else {
-                            sprintf(opB, "[%s%d]", registersNames[codReg], offset);
-                        }
-                    }
+                    char *modStr = (modifier == 1) ? "b" : (modifier == 2) ? "w" : "l";   // sin prefijo = 4 bytes = l
+                    sprintf(opB, "%s[%s%+d]", modStr, registersNames[codReg], offset);     // %+d: siempre con signo (+0, +4, -4)
                     break;
                 }
 
@@ -715,32 +522,20 @@ void DISASSEMBLERV2(int8_t *mainMemory, int32_t *registers, int32_t listSegments
                     break;
             }
 
-            char marker[4] = "  ";
-            if ((Fultinst & 0xFFFF) == entryPoint) {
-                strcpy(marker, "> ");
-            }
+            char marca = ((Lultinst & 0xFFFF) == entryPoint) ? '>' : ' ';
 
-            if (tipoA == 0 && tipoB == 0) {
-                printf("%s[%04X]  %-18s   | %-4s\n",
-                    marker,
-                    (uint16_t)Fultinst,
-                    bytesStr,
-                    opndNames[registers[OPC]]);
-            } else if (tipoA == 0 && tipoB != 0) {
-                printf("%s[%04X]  %-18s   | %-4s %s\n",
-                    marker,
-                    (uint16_t)Fultinst,
-                    bytesStr,
-                    opndNames[registers[OPC]],
-                    opB);
-            } else {
-                printf("%s[%04X]  %-18s   | %-4s %s, %s\n",
-                    marker,
-                    (uint16_t)Fultinst,
-                    bytesStr,
-                    opndNames[registers[OPC]],
-                    opA,
-                    opB);
+            if (tipoA == 0 && tipoB == 0)               // sin operandos
+                printf("%c[%04X] %-21s| %-4s\n",
+                    marca, (uint16_t)Fultinst, bytesStr, opndNames[registers[OPC]]);
+            else if (tipoA == 0)                        // un operando (esta en OP2)
+                printf("%c[%04X] %-21s| %-4s %10s\n",
+                    marca, (uint16_t)Fultinst, bytesStr, opndNames[registers[OPC]], opB);
+            else {                                      // dos operandos
+                char opAComa[70];
+                sprintf(opAComa, "%s,", opA);           // la coma va pegada al operando A
+                printf("%c[%04X] %-21s| %-4s %11s %10s\n",
+                    marca, (uint16_t)Fultinst, bytesStr, opndNames[registers[OPC]], opAComa, opB);
+            
             }
         }
     }
@@ -1100,13 +895,9 @@ int cargarVMX(VMArgs *args, int32_t *registers, int32_t *listSegments, int8_t *m
 
 
 
-    if (args->disassemble && version == 1){
+    if (args->disassemble){
         registers[IP] = registers[CS];
-        DISASSEMBLER(mainMemory, registers, listSegments);
-    }
-    else if (args->disassemble && version == 2){
-        registers[IP] = registers[CS];
-        DISASSEMBLERV2(mainMemory, registers, listSegments);
+        DISASSEMBLERV2(mainMemory, registers, listSegments, entryPoint);
     }
 
     registers[IP]=registers[CS] | entryPoint;
