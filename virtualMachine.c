@@ -1651,13 +1651,16 @@ void POP(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMConte
 
 //Funcion CALL
 void CALL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
+
+    int flag = pushValue(mainMemory, registers, listSegments, registers[IP]);
+    
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);
 
     if (valor < 0 || valor >= getSegmentSize(registers[CS], listSegments)){
         runtimeError(registers, "Salto fuera del segmento de codigo");
         return;
     }
-    if (pushValue(mainMemory, registers, listSegments, registers[IP]))
+    if (flag)
         registers[IP] = (registers[IP] & H2Bt) | (valor & L2Bt);
 }
 
