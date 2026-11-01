@@ -315,9 +315,13 @@ int parseArgs(int argc, char *argv[], VMArgs *args){
         char *a = argv[i];
 
         if (strcmp(a, "-p") == 0) {
-            args->params = &argv[i + 1];
             args->paramCount = argc - i - 1;
-            break;
+            if(args->paramCount > 0){
+                args->params = &argv[i+1]; // -p sin parametros = como si no viniera -p
+            }
+            
+
+            break; //Corta el for al encontrar -p, los siguientes parametros son del programa y no de la VM
         }
         else if (strcmp(a, "-d") == 0)
             args->disassemble = 1;
@@ -1115,19 +1119,15 @@ int tamOperando(int32_t operando){
 //Funcion para leer la siguiente instruccion
 void readNextInst(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]){
     if (registers[IP]!=-1){
-        int dir = getDir(registers[IP],listSegments);
-
-        if (dir == -1) {
-            runtimeError(registers, "Error de segmento al leer siguiente instruccion");
-            return;
-        }
-
-        int32_t tamSegmento = getSegmentEnd(registers[CS], listSegments);
-
-        if (dir >= tamSegmento){
+        //Si el IP apunta fuera del Code Segment (otro segmento, segmento invalido u offset fuera del tamaño) finaliza el proceso
+        if (((registers[IP] >> 16) & L2Bt) != ((registers[CS] >> 16) & L2Bt) ||
+            (registers[IP] & L2Bt) >= getSegmentSize(registers[CS], listSegments)){
             STOP(mainMemory, registers, listSegments, 0);
             return;
         }
+
+        int dir = getDir(registers[IP],listSegments);
+        int32_t tamSegmento = getSegmentEnd(registers[CS], listSegments);
         
         int8_t operacion = mainMemory[dir];
         int32_t tipoA = (operacion >> 4) & 0b11;
@@ -1812,9 +1812,11 @@ void SAR(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContex
 void RND(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
     int32_t valor;
     int32_t b = getValorOpnd(registers[OP2], mainMemory, registers,listSegments, ctx);
-    if (b < 0) 
+    if (b < 0)
         b = 0;     //evita rand() % 0
-    valor=rand() % (b+1);
+    //En Windows rand() llega solo hasta 32767 (15 bits): se combinan tres llamadas para cubrir 32 bits
+    uint32_t r = ((uint32_t)rand() << 30) ^ ((uint32_t)rand() << 15) ^ (uint32_t)rand();
+    valor = (int32_t)(r % ((uint32_t)b + 1));   //en uint32_t, b+1 no desborda aunque b sea INT32_MAX
     writeInOp(registers[OP1],valor, mainMemory, registers,listSegments);
 
 }
