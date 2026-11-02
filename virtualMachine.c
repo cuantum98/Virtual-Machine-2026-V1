@@ -189,13 +189,15 @@ int pushValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], in
 
 int popValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t *valor);
 
-int reservarPila(int32_t *registers);
+int reservarPila(int32_t *registers, int32_t listSegments[]);
 
 void escribirTope(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t valor);
 
 int getSegmentBase(int32_t reg, int32_t *listSegments);
 
 int getSegmentSize(int32_t reg, int32_t *listSegments);
+
+int segmentoValido(int32_t reg, int32_t *listSegments);
 
 int setParamSegment(int32_t *listSegments,VMArgs * args, int8_t *mainMemory, int32_t *registers);
 
@@ -247,8 +249,17 @@ int main(int argc,char* argv[]){ //gcc virtualMachine.c -o vmx.exe -Wall -Wextra
     }
     else{                           // solo .vmi: se retoma la imagen
         if (!cargarVMI(args.vmiPath, registers, listSegments, &mainMemory, &ctx.memKiB)){
-            free(mainMemory);     
+            free(mainMemory);
             return 1;
+        }
+        if (args.disassemble){
+            //El .vmi no guarda el entry point: se marca con '>' la instruccion donde se retoma (IP actual)
+            //El disassembler pisa IP, OPC, OP1 y OP2: se guardan los registros y se restauran despues
+            int32_t copiaRegs[32];
+            memcpy(copiaRegs, registers, sizeof(copiaRegs));
+            registers[IP] = registers[CS];
+            DISASSEMBLERV2(mainMemory, registers, listSegments, (uint16_t)(copiaRegs[IP] & L2Bt));
+            memcpy(registers, copiaRegs, sizeof(copiaRegs));
         }
     }
         
@@ -708,7 +719,7 @@ int paramSegmentSize(VMArgs *args){
 
 //Extrae un valor de la pila, devuelve 1 si salio bien y 0 si hubo underflow, guarda en valor el elemento popeado
 int popValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t *valor){
-    if(registers[SS] == -1){
+    if(!segmentoValido(registers[SS], listSegments)){ //SS inexistente (-1) o con un indice fuera de la tabla
         runtimeError(registers, "STACK UNDERFLOW");
         return 0;
     }
@@ -726,8 +737,8 @@ int popValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int
 }
 
 //Reserva 4 bytes en la pila (pasos 1 y 2 de PUSH). Devuelve 0 si hubo overflow
-int reservarPila(int32_t *registers){
-    if(registers[SS] == -1){
+int reservarPila(int32_t *registers, int32_t listSegments[]){
+    if(!segmentoValido(registers[SS], listSegments)){ //SS inexistente (-1) o con un indice fuera de la tabla
         runtimeError(registers, "STACK OVERFLOW");
         return 0;
     }
@@ -750,18 +761,28 @@ void escribirTope(int8_t *mainMemory, int32_t *registers, int32_t listSegments[]
 
 //Pushea un valor a la pila, devuelve 1 si salio bien y 0 si hubo overflow, guarda en valor el elemento pusheado
 int pushValue(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], int32_t valor){
-    if (!reservarPila(registers))
+    if (!reservarPila(registers, listSegments))
         return 0;
     escribirTope(mainMemory, registers, listSegments, valor);
     return 1;
 }
 
 
-int getSegmentBase(int32_t reg, int32_t *listSegments){ //Funcion que obtiene la base del segmento al que apunta reg
+//Devuelve 1 si reg apunta a una entrada existente de la tabla de segmentos (mismo control que getDir)
+int segmentoValido(int32_t reg, int32_t *listSegments){
+    int idx = (reg >> 16) & 0xFFFF;
+    return idx < NUM_SEGMENTOS && listSegments[idx] != -1;
+}
+
+int getSegmentBase(int32_t reg, int32_t *listSegments){ //Funcion que obtiene la base del segmento al que apunta reg (0 si es invalido)
+    if (!segmentoValido(reg, listSegments))
+        return 0;
     return (listSegments[(reg >> 16) & 0xFFFF] >> 16) & 0xFFFF;
 }
 
-int getSegmentSize(int32_t reg, int32_t *listSegments){ //Funcion que obtiene el tamaño del segmento al que apunta reg
+int getSegmentSize(int32_t reg, int32_t *listSegments){ //Funcion que obtiene el tamaño del segmento al que apunta reg (0 si es invalido)
+    if (!segmentoValido(reg, listSegments))
+        return 0;
     return listSegments[(reg >> 16) & 0xFFFF] & 0xFFFF;
 }
 
@@ -1218,7 +1239,7 @@ void loadInMemory(int32_t *registers, int8_t *mainMemory, int32_t listSegments[]
         // fDir es la dirección física de inicio
         // Necesitamos verificar que [fDir ... fDir + opSize - 1] esté dentro del segmento
         if ((fDir + opSize) > limSegmento) {
-            printf("Intento de acceso: [%d, %d), Límite del segmento: %d\n", fDir, fDir + opSize, limSegmento);
+            // printf("Intento de acceso: [%d, %d), Límite del segmento: %d\n", fDir, fDir + opSize, limSegmento);
             runtimeError(registers, "Error de segmento al cargar dato en memoria");
             return;
         }
@@ -1249,7 +1270,7 @@ void readFromMemory(int32_t *registers, int8_t *mainMemory, int32_t listSegments
         int limSegmento = getSegmentEnd(registers[LAR], listSegments);
         
         if ((fDir + opSize) > limSegmento) {
-            printf("Intento de acceso: [%d, %d), Límite del segmento: %d\n", fDir, fDir + opSize, limSegmento);
+            //printf("Intento de acceso: [%d, %d), Límite del segmento: %d\n", fDir, fDir + opSize, limSegmento);
             runtimeError(registers, "Error de segmento al leer dato de la memoria");
             return;
         }
@@ -1292,8 +1313,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMConte
         case 1:{
             switch (registers[EAX]){
                 case 1:
-                    for (i=0;i<aux;i++){
-                        printf("\n");
+                    for (i=0;i<aux && registers[IP] != -1;i++){ // corta si hubo error de segmento
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
                         scanf(" %d",&registers[MBR]);
                         descartarLinea();
@@ -1302,7 +1322,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMConte
                     }    
                 break;
                 case 2:
-                    for (i=0;i<aux;i++){
+                    for (i=0;i<aux && registers[IP] != -1;i++){ // corta si hubo error de segmento
                             char c;
                             printf("[%04x]:",getDir(registers[LAR],listSegments));
                             scanf(" %c",&c);
@@ -1313,7 +1333,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMConte
                     }
                 break;
                 case 4:
-                    for (i=0;i<aux;i++){
+                    for (i=0;i<aux && registers[IP] != -1;i++){ // corta si hubo error de segmento
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
                         scanf(" %o",&registers[MBR]);
                         descartarLinea();
@@ -1322,7 +1342,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMConte
                     }
                 break;
                 case 8:
-                    for (i=0;i<aux;i++){
+                    for (i=0;i<aux && registers[IP] != -1;i++){ // corta si hubo error de segmento
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
                         scanf(" %x",&registers[MBR]);
                         descartarLinea();
@@ -1331,7 +1351,7 @@ void SYS (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMConte
                     }
                 break;
                 case 16:
-                    for (i=0;i<aux;i++){
+                    for (i=0;i<aux && registers[IP] != -1;i++){ // corta si hubo error de segmento
                         printf("[%04x]:",getDir(registers[LAR],listSegments));
                         scanf(" %32s",auxS);
                         descartarLinea();
@@ -1527,9 +1547,9 @@ void setCC(OpType op, int32_t a, int32_t b, int32_t resultado, int32_t *register
 
 //Funcion JMP
 void JMP (int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContext *ctx){
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx) & L2Bt; //solo el offset (16 bits bajos)
 
-    if (((listSegments[(registers[CS] >> 16) & L2Bt] & L2Bt) > valor) &&  (valor>=0)){
+    if (getSegmentSize(registers[CS], listSegments) > valor){
         registers[IP] =(registers[IP] & H2Bt)+valor;
     }
     else{
@@ -1635,7 +1655,7 @@ void NOT(int8_t *mainMemory, int32_t *registers,int32_t listSegments[], VMContex
 
 //Funciones de pila -------------------------------- !!
 void PUSH(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMContext *ctx){
-    if (!reservarPila(registers))           // pasos 1 y 2: SP -= 4 y overflow
+    if (!reservarPila(registers, listSegments))           // pasos 1 y 2: SP -= 4 y overflow
         return;
     int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);  // paso 3, con el SP nuevo
     escribirTope(mainMemory, registers, listSegments, valor);
@@ -1654,9 +1674,9 @@ void CALL(int8_t *mainMemory, int32_t *registers, int32_t listSegments[], VMCont
 
     int flag = pushValue(mainMemory, registers, listSegments, registers[IP]);
     
-    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx);
+    int32_t valor = getValorOpnd(registers[OP2], mainMemory, registers, listSegments, ctx) & L2Bt; //solo el offset (16 bits bajos)
 
-    if (valor < 0 || valor >= getSegmentSize(registers[CS], listSegments)){
+    if (valor >= getSegmentSize(registers[CS], listSegments)){
         runtimeError(registers, "Salto fuera del segmento de codigo");
         return;
     }
